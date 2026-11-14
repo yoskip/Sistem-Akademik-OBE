@@ -26,11 +26,12 @@ function db(): PDO
                 PDO::ATTR_EMULATE_PREPARES   => false,
             ]);
         } catch (PDOException $e) {
+            // Detail error tidak ditampilkan ke pengguna agar tidak membocorkan
+            // konfigurasi server/database.
             http_response_code(500);
             die('<div style="font-family:sans-serif;padding:24px">'
-                . '<h3>Koneksi database gagal</h3><p>'
-                . htmlspecialchars($e->getMessage())
-                . '</p><p>Pastikan MySQL di XAMPP berjalan dan database <b>db_obe</b> sudah diimpor.</p></div>');
+                . '<h3>Koneksi database gagal</h3>'
+                . '<p>Pastikan MySQL di XAMPP berjalan dan database <b>db_obe</b> sudah diimpor.</p></div>');
         }
     }
     return $pdo;

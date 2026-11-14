@@ -11,6 +11,7 @@ CREATE DATABASE IF NOT EXISTS db_obe
 USE db_obe;
 
 SET FOREIGN_KEY_CHECKS = 0;
+DROP TABLE IF EXISTS login_attempts;
 DROP TABLE IF EXISTS audit_logs;
 DROP TABLE IF EXISTS inventaris_kelengkapan;
 DROP TABLE IF EXISTS rps;
@@ -442,6 +443,19 @@ CREATE TABLE inventaris_kelengkapan (
   jml_ada INT NOT NULL DEFAULT 0,
   status VARCHAR(20) NOT NULL DEFAULT 'Belum',
   CONSTRAINT fk_inv_mk FOREIGN KEY (mk_id) REFERENCES mata_kuliah(id) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB;
+
+-- --------------------------------------------------------- login_attempts
+-- Pencatatan percobaan login gagal untuk rate limiting (tanpa password).
+CREATE TABLE login_attempts (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  identity_hash CHAR(64) NOT NULL,
+  ip VARCHAR(45) NOT NULL,
+  success TINYINT(1) NOT NULL DEFAULT 0,
+  attempted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_login_attempt_identity (identity_hash, attempted_at),
+  KEY idx_login_attempt_ip (ip, attempted_at)
 ) ENGINE=InnoDB;
 
 -- ------------------------------------------------------------- audit_logs

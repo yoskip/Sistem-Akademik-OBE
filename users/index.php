@@ -25,7 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if ($id === (int)$me['id']) { $aktif = 1; }
                     if ($password !== '') {
                         $pdo->prepare('UPDATE users SET nama=?, username=?, email=?, password=?, role_id=?, aktif=? WHERE id=?')
-                            ->execute([$nama, $username, $email ?: null, password_hash($password, PASSWORD_DEFAULT), $roleId, $aktif, $id]);
+                            ->execute([$nama, $username, $email ?: null, hash_password($password), $roleId, $aktif, $id]);
                     } else {
                         $pdo->prepare('UPDATE users SET nama=?, username=?, email=?, role_id=?, aktif=? WHERE id=?')
                             ->execute([$nama, $username, $email ?: null, $roleId, $aktif, $id]);
@@ -34,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     flash('success', 'Pengguna diperbarui.');
                 } else {
                     $pdo->prepare('INSERT INTO users (nama, username, email, password, role_id, aktif) VALUES (?,?,?,?,?,?)')
-                        ->execute([$nama, $username, $email ?: null, password_hash($password, PASSWORD_DEFAULT), $roleId, $aktif]);
+                        ->execute([$nama, $username, $email ?: null, hash_password($password), $roleId, $aktif]);
                     log_activity('create', 'users', "Pengguna $username ditambahkan");
                     flash('success', 'Pengguna ditambahkan.');
                 }

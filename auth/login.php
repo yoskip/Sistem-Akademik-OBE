@@ -11,31 +11,45 @@ $identity = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
     $identity = trim($_POST['identity'] ?? '');
-    $password = $_POST['password'] ?? '';
+    $password = (string)($_POST['password'] ?? '');
+    $identityHash = login_identity_hash($identity);
+    $ip = client_ip();
 
-    if ($identity === '' || $password === '') {
-        $error = 'Username/email dan password wajib diisi.';
+    if (is_login_blocked($identityHash, $ip)) {
+        // Tolak sebelum query user/password_verify dijalankan.
+        http_response_code(429);
+        header('Retry-After: ' . (LOGIN_WINDOW_MINUTES * 60));
+        $error = LOGIN_THROTTLED_MESSAGE;
+        log_login_blocked($identityHash, $ip);
     } else {
-        $stmt = db()->prepare(
-            'SELECT u.*, r.nama AS role FROM users u
-             JOIN roles r ON r.id = u.role_id
-             WHERE (u.username = ? OR u.email = ?) LIMIT 1'
-        );
-        $stmt->execute([$identity, $identity]);
-        $user = $stmt->fetch();
+        $user = false;
+        if ($identity !== '' && $password !== '') {
+            $stmt = db()->prepare(
+                'SELECT u.*, r.nama AS role FROM users u
+                 JOIN roles r ON r.id = u.role_id
+                 WHERE (u.username = ? OR u.email = ?) LIMIT 1'
+            );
+            $stmt->execute([$identity, $identity]);
+            $user = $stmt->fetch();
+        }
 
-        if (!$user || !password_verify($password, $user['password'])) {
-            $error = 'Username/email atau password salah.';
-        } elseif ((int)$user['aktif'] !== 1) {
-            $error = 'Akun Anda sedang tidak aktif. Hubungi administrator.';
+        $verified = $user ? verify_and_upgrade_password(db(), $user, $password) : false;
+        if (!$user) {
+            // Samakan waktu respons agar akun tidak mudah ditebak.
+            burn_password_verification($password);
+        }
+
+        if (!$user || !$verified || (int)$user['aktif'] !== 1) {
+            record_login_failure($identityHash, $ip);
+            log_login_failure($identityHash, $ip);
+            $error = LOGIN_FAILED_MESSAGE;
         } else {
             session_regenerate_id(true);
             $_SESSION['user'] = [
-                'id'     => (int)$user['id'],
-                'nama'   => $user['nama'],
+                'id'       => (int)$user['id'],
+                'nama'     => $user['nama'],
                 'username' => $user['username'],
-                'email'  => $user['email'],
-                'role'   => $user['role'],
+                'role'     => $user['role'],
             ];
             log_activity('login', 'auth', 'Pengguna berhasil masuk');
             flash('success', 'Selamat datang, ' . $user['nama'] . '.');
@@ -87,12 +101,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           <i class="bi bi-box-arrow-in-right me-1"></i> Login
         </button>
       </form>
-      <div class="mt-4 small text-muted">
-        <div class="fw-semibold mb-1">Akun demo:</div>
-        <div>Admin: <code>admin / admin123</code></div>
-        <div>Kaprodi: <code>kaprodi / kaprodi123</code></div>
-        <div>Dosen: <code>dosen / dosen123</code></div>
-      </div>
     </div>
   </div>
 </body>
