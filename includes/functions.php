@@ -7,32 +7,71 @@ const LOGIN_FAILED_MESSAGE = 'Username atau password salah.';
 const LOGIN_THROTTLED_MESSAGE = 'Terlalu banyak percobaan login. Silakan coba kembali beberapa saat lagi.';
 const DUMMY_PASSWORD_HASH = '$2y$10$FlzwwjaWTtPVMO0eKmXJTuaoaj0V4iMO37a2WJZe1cBaCXMQ0ML/S';
 
+// Idle timeout 30 menit dan absolute timeout 8 jam sejak login.
+const SESSION_IDLE_TIMEOUT = 1800;
+const SESSION_ABSOLUTE_TIMEOUT = 28800;
+const SESSION_EXPIRED_MESSAGE = 'Sesi Anda telah berakhir. Silakan login kembali.';
+
+function is_https_request(): bool
+{
+    return (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || (($_SERVER['SERVER_PORT'] ?? '') == 443)
+        || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+}
+
+/**
+ * Secure cookie mengikuti environment:
+ * - SESSION_COOKIE_SECURE=1 untuk produksi HTTPS
+ * - SESSION_COOKIE_SECURE=0 untuk lokal HTTP
+ * Bila tidak diset, nilai mengikuti skema request (HTTP=false, HTTPS=true).
+ */
+function session_cookie_secure(): bool
+{
+    $env = getenv('SESSION_COOKIE_SECURE');
+    if ($env === false && isset($_SERVER['SESSION_COOKIE_SECURE'])) {
+        $env = $_SERVER['SESSION_COOKIE_SECURE'];
+    }
+    if ($env !== false && $env !== '') {
+        return filter_var($env, FILTER_VALIDATE_BOOLEAN);
+    }
+
+    return is_https_request();
+}
+
 function start_secure_session(): void
 {
     if (session_status() === PHP_SESSION_ACTIVE) {
         return;
     }
 
-    $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-        || (($_SERVER['SERVER_PORT'] ?? '') == 443);
+    if (PHP_SAPI === 'cli') {
+        $savePath = session_save_path();
+        if ($savePath === '' || !@is_writable($savePath)) {
+            @session_save_path(sys_get_temp_dir());
+        }
+    }
+
+    $secure = session_cookie_secure();
 
     ini_set('session.use_strict_mode', '1');
     ini_set('session.use_only_cookies', '1');
     ini_set('session.use_trans_sid', '0');
     ini_set('session.cookie_httponly', '1');
     ini_set('session.cookie_samesite', 'Lax');
-    ini_set('session.cookie_secure', $https ? '1' : '0');
+    ini_set('session.cookie_secure', $secure ? '1' : '0');
+    ini_set('session.cookie_lifetime', '0');
 
     session_set_cookie_params([
         'lifetime' => 0,
         'path'     => '/',
         'domain'   => '',
-        'secure'   => $https,
+        'secure'   => $secure,
         'httponly' => true,
         'samesite' => 'Lax',
     ]);
 
     session_start();
+    enforce_session_timeout();
 }
 
 start_secure_session();
@@ -46,6 +85,79 @@ function redirect(string $path): void
 {
     header('Location: ' . $path);
     exit;
+}
+
+/** Cegah halaman sensitif ditampilkan kembali dari cache browser (tombol Back). */
+function send_no_cache_headers(): void
+{
+    if (headers_sent()) {
+        return;
+    }
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+    header('Expires: 0');
+}
+
+/** Hapus data session, hancurkan session server, dan hapus cookie di browser. */
+function destroy_session_and_cookie(): void
+{
+    $_SESSION = [];
+
+    if (ini_get('session.use_cookies')) {
+        $p = session_get_cookie_params();
+        setcookie(session_name(), '', [
+            'expires'  => time() - 42000,
+            'path'     => $p['path'] ?: '/',
+            'domain'   => $p['domain'] ?? '',
+            'secure'   => (bool)($p['secure'] ?? false),
+            'httponly' => (bool)($p['httponly'] ?? true),
+            'samesite' => $p['samesite'] ?? 'Lax',
+        ]);
+    }
+
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        session_destroy();
+    }
+}
+
+/** Pemeriksaan murni agar idle timeout dan absolute timeout mudah diuji. */
+function session_is_expired(int $loginAt, int $lastActivity, int $now): bool
+{
+    if ($loginAt <= 0 || $lastActivity <= 0) {
+        return true;
+    }
+    if (($now - $lastActivity) > SESSION_IDLE_TIMEOUT) {
+        return true;
+    }
+    if (($now - $loginAt) > SESSION_ABSOLUTE_TIMEOUT) {
+        return true;
+    }
+
+    return false;
+}
+
+function expire_session(): void
+{
+    destroy_session_and_cookie();
+    redirect(BASE_URL . '/auth/login.php?expired=1');
+}
+
+/** Dipanggil pada setiap request; perbarui waktu aktivitas bila session masih valid. */
+function enforce_session_timeout(): void
+{
+    if (!is_logged_in()) {
+        return;
+    }
+
+    $now = time();
+    $loginAt = (int)($_SESSION['login_at'] ?? 0);
+    $lastActivity = (int)($_SESSION['last_activity'] ?? 0);
+
+    if (session_is_expired($loginAt, $lastActivity, $now)) {
+        expire_session();
+    }
+
+    $_SESSION['last_activity'] = $now;
 }
 
 function flash(string $type, string $message): void
@@ -77,9 +189,13 @@ function current_role(): string
 
 function require_login(): void
 {
+    enforce_session_timeout();
+
     if (!is_logged_in()) {
         redirect(BASE_URL . '/auth/login.php');
     }
+
+    send_no_cache_headers();
 }
 
 function require_role(array $roles): void

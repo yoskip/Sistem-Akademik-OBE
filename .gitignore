@@ -1,0 +1,22 @@
+# Environment & secrets
+.env
+.env.*
+!.env.example
+config/secrets.php
+
+# Logs & temporary files
+*.log
+logs/
+tmp/
+tests/*.log
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Generated / backup files
+*.bak
+*.sql.gz
+uploads/

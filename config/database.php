@@ -1,12 +1,23 @@
 <?php
 /**
  * Konfigurasi koneksi database + konstanta aplikasi.
- * Sesuaikan DB_USER / DB_PASS bila XAMPP Anda memakai password.
+ * Nilai dapat dioverride lewat environment variable server (Apache/PHP-FPM),
+ * misalnya SetEnv DB_USER / DB_PASS. Jangan menaruh password produksi di repo.
+ * Default di bawah adalah kredensial lokal XAMPP (tanpa password).
  */
-define('DB_HOST', '127.0.0.1');
-define('DB_NAME', 'db_obe');
-define('DB_USER', 'root');
-define('DB_PASS', '');
+function env_value(string $key, string $default = ''): string
+{
+    $value = getenv($key);
+    if ($value === false && isset($_SERVER[$key])) {
+        $value = $_SERVER[$key];
+    }
+    return ($value === false || $value === '') ? $default : (string)$value;
+}
+
+define('DB_HOST', env_value('DB_HOST', '127.0.0.1'));
+define('DB_NAME', env_value('DB_NAME', 'db_obe'));
+define('DB_USER', env_value('DB_USER', 'root'));
+define('DB_PASS', env_value('DB_PASS', ''));
 
 define('APP_NAME', 'SI Kurikulum OBE');
 define('APP_PRODI', 'Teknik Informatika - Universitas YARSI');

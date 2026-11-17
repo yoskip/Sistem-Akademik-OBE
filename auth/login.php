@@ -1,11 +1,13 @@
 <?php
 require_once __DIR__ . '/../includes/functions.php';
 
+send_no_cache_headers();
+
 if (is_logged_in()) {
     redirect(BASE_URL . '/dashboard/index.php');
 }
 
-$error = '';
+$error = isset($_GET['expired']) ? SESSION_EXPIRED_MESSAGE : '';
 $identity = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -49,8 +51,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'id'       => (int)$user['id'],
                 'nama'     => $user['nama'],
                 'username' => $user['username'],
+                'npm_nidn' => $user['npm'] ?? $user['nidn'] ?? $user['username'],
                 'role'     => $user['role'],
             ];
+            $_SESSION['login_at'] = time();
+            $_SESSION['last_activity'] = time();
+            unset($_SESSION['csrf']);
             log_activity('login', 'auth', 'Pengguna berhasil masuk');
             flash('success', 'Selamat datang, ' . $user['nama'] . '.');
             redirect(BASE_URL . '/dashboard/index.php');
