@@ -12,35 +12,57 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $id = (int)($_POST['id'] ?? 0);
         $mkId = (int)($_POST['mk_id'] ?? 0);
         $cpmkId = (int)($_POST['cpmk_id'] ?? 0);
-        if (!$mkId || !$cpmkId) {
-            flash('danger', 'Mata kuliah dan CPMK wajib dipilih.');
+        if (!validate_id($mkId)) {
+            http_response_code(422);
+            flash('danger', 'Mata kuliah wajib dipilih.');
+        } elseif (!validate_id($cpmkId)) {
+            http_response_code(422);
+            flash('danger', 'CPMK wajib dipilih.');
+        } elseif ($id !== 0 && !validate_id($id)) {
+            http_response_code(422);
+            flash('danger', 'ID data tidak valid.');
         } else {
             $m = $pdo->prepare('SELECT kode_mk FROM mata_kuliah WHERE id=?'); $m->execute([$mkId]); $mkRaw = (string)$m->fetchColumn();
             $c = $pdo->prepare('SELECT kode_cpmk, cpl_id FROM cpmk WHERE id=?'); $c->execute([$cpmkId]); $cr = $c->fetch();
             $cplId = $cr['cpl_id'] ?? null;
             $cplRaw = '-';
             if ($cplId) { $q = $pdo->prepare('SELECT kode_cpl FROM cpl WHERE id=?'); $q->execute([$cplId]); $cplRaw = (string)$q->fetchColumn(); }
+            $allowedTeknikCols = [
+                'mk_id', 'kode_mk_raw', 'cpmk_id', 'kode_cpmk_raw', 'cpl_id', 'kode_cpl_raw',
+                'mbkm', 'partisipasi', 'observasi', 'unjuk_kerja', 'tes_uts', 'tes_uas', 'tes_lisan'
+            ];
             $cols = ['mk_id', 'kode_mk_raw', 'cpmk_id', 'kode_cpmk_raw', 'cpl_id', 'kode_cpl_raw'];
             $vals = [$mkId, $mkRaw, $cpmkId, $cr['kode_cpmk'] ?? '', $cplId, $cplRaw];
-            foreach ($fields as $f => $lbl) { $cols[] = $f; $vals[] = !empty($_POST[$f]) ? 'v' : null; }
+            foreach ($fields as $f => $lbl) {
+                if (!in_array($f, $allowedTeknikCols, true)) continue;
+                $cols[] = $f;
+                $vals[] = !empty($_POST[$f]) ? 'v' : null;
+            }
             try {
                 if ($id > 0) {
-                    $set = implode(',', array_map(fn($c) => "$c=?", array_slice($cols, 1)));
+                    $set = implode(',', array_map(fn($c) => "`$c`=?", array_slice($cols, 1)));
                     $pdo->prepare("UPDATE teknik_penilaian_cpmk SET $set WHERE id=?")->execute(array_merge(array_slice($vals, 1), [$id]));
                     log_activity('update', 'teknik_penilaian', "Teknik penilaian $mkRaw diperbarui");
                     flash('success', 'Teknik penilaian diperbarui.');
                 } else {
+                    $escapedCols = implode(',', array_map(fn($c) => "`$c`", $cols));
                     $ph = implode(',', array_fill(0, count($cols), '?'));
-                    $pdo->prepare("INSERT INTO teknik_penilaian_cpmk (" . implode(',', $cols) . ") VALUES ($ph)")->execute($vals);
+                    $pdo->prepare("INSERT INTO teknik_penilaian_cpmk ($escapedCols) VALUES ($ph)")->execute($vals);
                     log_activity('create', 'teknik_penilaian', "Teknik penilaian $mkRaw ditambahkan");
                     flash('success', 'Teknik penilaian ditambahkan.');
                 }
             } catch (PDOException $e) { flash('danger', 'Gagal menyimpan teknik penilaian.'); }
         }
     } elseif ($action === 'delete') {
-        $pdo->prepare('DELETE FROM teknik_penilaian_cpmk WHERE id=?')->execute([(int)($_POST['id'] ?? 0)]);
-        log_activity('delete', 'teknik_penilaian', 'Teknik penilaian dihapus');
-        flash('success', 'Data dihapus.');
+        $id = $_POST['id'] ?? null;
+        if (!validate_id($id)) {
+            http_response_code(422);
+            flash('danger', 'ID data tidak valid.');
+        } else {
+            $pdo->prepare('DELETE FROM teknik_penilaian_cpmk WHERE id=?')->execute([(int)$id]);
+            log_activity('delete', 'teknik_penilaian', 'Teknik penilaian dihapus');
+            flash('success', 'Data dihapus.');
+        }
     }
     redirect('teknik.php');
 }

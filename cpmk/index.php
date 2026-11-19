@@ -12,8 +12,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $kode = strtoupper(trim($_POST['kode_cpmk'] ?? ''));
         $cplId = (int)($_POST['cpl_id'] ?? 0);
         $desk = trim($_POST['deskripsi'] ?? '');
-        if ($kode === '' || !$cplId || $desk === '') {
-            flash('danger', 'Kode CPMK, CPL, dan deskripsi wajib diisi.');
+        if (!validate_code($kode, 2, 30)) {
+            http_response_code(422);
+            flash('danger', 'Format kode CPMK tidak sesuai (harus 2-30 karakter alfanumerik/tanda hubung).');
+        } elseif (!validate_id($cplId)) {
+            http_response_code(422);
+            flash('danger', 'Pilihan CPL tidak valid.');
+        } elseif (!validate_description($desk, 1, 1000)) {
+            http_response_code(422);
+            flash('danger', 'Deskripsi CPMK wajib diisi (1-1000 karakter).');
+        } elseif ($id !== 0 && !validate_id($id)) {
+            http_response_code(422);
+            flash('danger', 'ID data tidak valid.');
         } else {
             try {
                 $pdo->beginTransaction();
@@ -37,13 +47,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
     } elseif ($action === 'delete') {
-        $id = (int)($_POST['id'] ?? 0);
-        try {
-            $pdo->prepare('DELETE FROM cpmk WHERE id=?')->execute([$id]);
-            log_activity('delete', 'cpmk', 'CPMK dihapus');
-            flash('success', 'CPMK dihapus.');
-        } catch (PDOException $e) {
-            flash('danger', 'CPMK tidak dapat dihapus karena masih direferensikan data lain.');
+        $id = $_POST['id'] ?? null;
+        if (!validate_id($id)) {
+            http_response_code(422);
+            flash('danger', 'ID data tidak valid.');
+        } else {
+            try {
+                $pdo->prepare('DELETE FROM cpmk WHERE id=?')->execute([(int)$id]);
+                log_activity('delete', 'cpmk', 'CPMK dihapus');
+                flash('success', 'CPMK dihapus.');
+            } catch (PDOException $e) {
+                flash('danger', 'CPMK tidak dapat dihapus karena masih direferensikan data lain.');
+            }
         }
     }
     redirect('index.php');
@@ -53,8 +68,16 @@ $q = trim($_GET['q'] ?? '');
 $cplFilter = (int)($_GET['cpl'] ?? 0);
 $where = [];
 $params = [];
-if ($q !== '') { $where[] = '(k.kode_cpmk LIKE ? OR k.deskripsi LIKE ?)'; $params[] = "%$q%"; $params[] = "%$q%"; }
-if ($cplFilter) { $where[] = 'k.cpl_id = ?'; $params[] = $cplFilter; }
+if ($q !== '') {
+    $q = mb_substr($q, 0, 100);
+    $where[] = '(k.kode_cpmk LIKE ? OR k.deskripsi LIKE ?)';
+    $params[] = "%$q%";
+    $params[] = "%$q%";
+}
+if ($cplFilter && validate_id($cplFilter)) {
+    $where[] = 'k.cpl_id = ?';
+    $params[] = $cplFilter;
+}
 $whereSql = $where ? 'WHERE ' . implode(' AND ', $where) : '';
 $s = $pdo->prepare("SELECT COUNT(*) FROM cpmk k $whereSql"); $s->execute($params); $total = (int)$s->fetchColumn();
 [$limit, $offset, , $page, $pages] = paginate($total, 12);
@@ -65,14 +88,24 @@ $stmt->execute($params); $rows = $stmt->fetchAll();
 $cpls = $pdo->query('SELECT * FROM cpl ORDER BY kode_cpl')->fetchAll();
 
 $edit = null;
-if (!empty($_GET['edit'])) { $s = $pdo->prepare('SELECT * FROM cpmk WHERE id=?'); $s->execute([(int)$_GET['edit']]); $edit = $s->fetch(); }
+if (!empty($_GET['edit']) && $_GET['edit'] !== '0') {
+    if (validate_id($_GET['edit'])) {
+        $s = $pdo->prepare('SELECT * FROM cpmk WHERE id=?');
+        $s->execute([(int)$_GET['edit']]);
+        $edit = $s->fetch();
+    }
+}
 $detail = null;
 if (!empty($_GET['detail'])) {
-    $s = $pdo->prepare('SELECT k.*, c.kode_cpl FROM cpmk k JOIN cpl c ON c.id=k.cpl_id WHERE k.id=?');
-    $s->execute([(int)$_GET['detail']]); $detail = $s->fetch();
-    if ($detail) {
-        $st = $pdo->prepare('SELECT m.kode_mk, m.nama_mk, m.semester FROM cpmk_mk x JOIN mata_kuliah m ON m.id=x.mk_id WHERE x.cpmk_id=? ORDER BY m.semester, m.kode_mk');
-        $st->execute([$detail['id']]); $detail['mk'] = $st->fetchAll();
+    if (validate_id($_GET['detail'])) {
+        $s = $pdo->prepare('SELECT k.*, c.kode_cpl FROM cpmk k JOIN cpl c ON c.id=k.cpl_id WHERE k.id=?');
+        $s->execute([(int)$_GET['detail']]);
+        $detail = $s->fetch();
+        if ($detail) {
+            $st = $pdo->prepare('SELECT m.kode_mk, m.nama_mk, m.semester FROM cpmk_mk x JOIN mata_kuliah m ON m.id=x.mk_id WHERE x.cpmk_id=? ORDER BY m.semester, m.kode_mk');
+            $st->execute([$detail['id']]);
+            $detail['mk'] = $st->fetchAll();
+        }
     }
 }
 

@@ -13,27 +13,57 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $cpmkId = (int)($_POST['cpmk_id'] ?? 0);
         $skor = $_POST['skor_maks'] !== '' ? (float)$_POST['skor_maks'] : null;
         $total = $_POST['total'] !== '' ? (float)$_POST['total'] : null;
-        if (!$mkId) { flash('danger', 'Mata kuliah wajib dipilih.'); }
-        else {
-            $m = $pdo->prepare('SELECT kode_mk FROM mata_kuliah WHERE id=?'); $m->execute([$mkId]); $mkRaw = (string)$m->fetchColumn();
-            $kc = null; $cplId = null; $kcp = null;
-            if ($cpmkId) { $c = $pdo->prepare('SELECT kode_cpmk, cpl_id FROM cpmk WHERE id=?'); $c->execute([$cpmkId]); $cr = $c->fetch(); $kc = $cr['kode_cpmk'] ?? null; $cplId = $cr['cpl_id'] ?? null; if ($cplId) { $q = $pdo->prepare('SELECT kode_cpl FROM cpl WHERE id=?'); $q->execute([$cplId]); $kcp = $q->fetchColumn(); } }
-            try {
-                if ($id > 0) {
-                    $pdo->prepare('UPDATE rumusan_akhir_cpl SET mk_id=?, kode_mk_raw=?, cpmk_id=?, kode_cpmk_raw=?, cpl_id=?, kode_cpl_raw=?, skor_maks=?, total=? WHERE id=?')
-                        ->execute([$mkId, $mkRaw, $cpmkId ?: null, $kc, $cplId, $kcp, $skor, $total, $id]);
-                    log_activity('update', 'rumusan_cpl', "Rumusan akhir CPL $mkRaw diperbarui");
-                    flash('success', 'Rumusan akhir CPL diperbarui.');
-                } else {
-                    $pdo->prepare('INSERT INTO rumusan_akhir_cpl (mk_id, kode_mk_raw, cpmk_id, kode_cpmk_raw, cpl_id, kode_cpl_raw, skor_maks, total) VALUES (?,?,?,?,?,?,?,?)')
-                        ->execute([$mkId, $mkRaw, $cpmkId ?: null, $kc, $cplId, $kcp, $skor, $total]);
-                    log_activity('create', 'rumusan_cpl', "Rumusan akhir CPL $mkRaw ditambahkan");
-                    flash('success', 'Rumusan akhir CPL ditambahkan.');
-                }
-            } catch (PDOException $e) { flash('danger', 'Gagal menyimpan rumusan akhir CPL.'); }
+
+        if ($id < 0 || ($id > 0 && !validate_id($id))) {
+            http_response_code(422);
+            flash('danger', 'ID rumusan tidak valid.');
+            redirect('rumusan_cpl.php');
         }
+        if (!validate_id($mkId)) {
+            http_response_code(422);
+            flash('danger', 'Mata kuliah wajib dipilih dengan ID valid.');
+            redirect('rumusan_cpl.php');
+        }
+        if ($cpmkId > 0 && !validate_id($cpmkId)) {
+            http_response_code(422);
+            flash('danger', 'CPMK tidak valid.');
+            redirect('rumusan_cpl.php');
+        }
+        if ($skor !== null && ($skor < 0 || $skor > 1000)) {
+            http_response_code(422);
+            flash('danger', 'Skor maksimal harus antara 0 dan 1000.');
+            redirect('rumusan_cpl.php');
+        }
+        if ($total !== null && ($total < 0 || $total > 1000)) {
+            http_response_code(422);
+            flash('danger', 'Total harus antara 0 dan 1000.');
+            redirect('rumusan_cpl.php');
+        }
+
+        $m = $pdo->prepare('SELECT kode_mk FROM mata_kuliah WHERE id=?'); $m->execute([$mkId]); $mkRaw = (string)$m->fetchColumn();
+        $kc = null; $cplId = null; $kcp = null;
+        if ($cpmkId) { $c = $pdo->prepare('SELECT kode_cpmk, cpl_id FROM cpmk WHERE id=?'); $c->execute([$cpmkId]); $cr = $c->fetch(); $kc = $cr['kode_cpmk'] ?? null; $cplId = $cr['cpl_id'] ?? null; if ($cplId) { $q = $pdo->prepare('SELECT kode_cpl FROM cpl WHERE id=?'); $q->execute([$cplId]); $kcp = $q->fetchColumn(); } }
+        try {
+            if ($id > 0) {
+                $pdo->prepare('UPDATE rumusan_akhir_cpl SET mk_id=?, kode_mk_raw=?, cpmk_id=?, kode_cpmk_raw=?, cpl_id=?, kode_cpl_raw=?, skor_maks=?, total=? WHERE id=?')
+                    ->execute([$mkId, $mkRaw, $cpmkId ?: null, $kc, $cplId, $kcp, $skor, $total, $id]);
+                log_activity('update', 'rumusan_cpl', "Rumusan akhir CPL $mkRaw diperbarui");
+                flash('success', 'Rumusan akhir CPL diperbarui.');
+            } else {
+                $pdo->prepare('INSERT INTO rumusan_akhir_cpl (mk_id, kode_mk_raw, cpmk_id, kode_cpmk_raw, cpl_id, kode_cpl_raw, skor_maks, total) VALUES (?,?,?,?,?,?,?,?)')
+                    ->execute([$mkId, $mkRaw, $cpmkId ?: null, $kc, $cplId, $kcp, $skor, $total]);
+                log_activity('create', 'rumusan_cpl', "Rumusan akhir CPL $mkRaw ditambahkan");
+                flash('success', 'Rumusan akhir CPL ditambahkan.');
+            }
+        } catch (PDOException $e) { flash('danger', 'Gagal menyimpan rumusan akhir CPL.'); }
     } elseif ($action === 'delete') {
-        $pdo->prepare('DELETE FROM rumusan_akhir_cpl WHERE id=?')->execute([(int)($_POST['id'] ?? 0)]);
+        $id = (int)($_POST['id'] ?? 0);
+        if (!validate_id($id)) {
+            http_response_code(422);
+            flash('danger', 'ID rumusan tidak valid.');
+            redirect('rumusan_cpl.php');
+        }
+        $pdo->prepare('DELETE FROM rumusan_akhir_cpl WHERE id=?')->execute([$id]);
         log_activity('delete', 'rumusan_cpl', 'Rumusan akhir CPL dihapus');
         flash('success', 'Data dihapus.');
     }

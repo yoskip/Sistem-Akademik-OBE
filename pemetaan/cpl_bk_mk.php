@@ -11,19 +11,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $cplId = (int)($_POST['cpl_id'] ?? 0);
         $bkId = (int)($_POST['bahan_kajian_id'] ?? 0);
         $mkId = (int)($_POST['mk_id'] ?? 0);
-        if (!$cplId || !$bkId || !$mkId) {
-            flash('danger', 'CPL, Bahan Kajian, dan Mata Kuliah wajib dipilih.');
-        } else {
-            $kode = $pdo->prepare('SELECT kode_mk FROM mata_kuliah WHERE id=?');
-            $kode->execute([$mkId]);
-            $raw = (string)$kode->fetchColumn();
-            $pdo->prepare('INSERT INTO cpl_bk_mk (cpl_id, bahan_kajian_id, mk_id, kode_mk_raw) VALUES (?,?,?,?)')
-                ->execute([$cplId, $bkId, $mkId, $raw]);
-            log_activity('create', 'pemetaan', "CPL-BK-MK ditambahkan ($raw)");
-            flash('success', 'Relasi CPL - BK - MK ditambahkan.');
+        if (!validate_id($cplId) || !validate_id($bkId) || !validate_id($mkId)) {
+            http_response_code(422);
+            flash('danger', 'CPL, Bahan Kajian, dan Mata Kuliah wajib dipilih dengan ID valid.');
+            redirect('cpl_bk_mk.php');
         }
+
+        $kode = $pdo->prepare('SELECT kode_mk FROM mata_kuliah WHERE id=?');
+        $kode->execute([$mkId]);
+        $raw = (string)$kode->fetchColumn();
+        if (!$raw) {
+            http_response_code(422);
+            flash('danger', 'Mata kuliah tidak ditemukan.');
+            redirect('cpl_bk_mk.php');
+        }
+
+        $pdo->prepare('INSERT INTO cpl_bk_mk (cpl_id, bahan_kajian_id, mk_id, kode_mk_raw) VALUES (?,?,?,?)')
+            ->execute([$cplId, $bkId, $mkId, $raw]);
+        log_activity('create', 'pemetaan', "CPL-BK-MK ditambahkan ($raw)");
+        flash('success', 'Relasi CPL - BK - MK ditambahkan.');
     } elseif ($action === 'delete') {
-        $pdo->prepare('DELETE FROM cpl_bk_mk WHERE id=?')->execute([(int)($_POST['id'] ?? 0)]);
+        $id = (int)($_POST['id'] ?? 0);
+        if (!validate_id($id)) {
+            http_response_code(422);
+            flash('danger', 'ID relasi tidak valid.');
+            redirect('cpl_bk_mk.php');
+        }
+        $pdo->prepare('DELETE FROM cpl_bk_mk WHERE id=?')->execute([$id]);
         log_activity('delete', 'pemetaan', 'Relasi CPL-BK-MK dihapus');
         flash('success', 'Relasi dihapus.');
     }

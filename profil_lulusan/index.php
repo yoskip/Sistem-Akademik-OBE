@@ -12,8 +12,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $kode = strtoupper(trim($_POST['kode_pl'] ?? ''));
         $nama = trim($_POST['nama_pl'] ?? '');
         $desk = trim($_POST['deskripsi'] ?? '');
-        if ($kode === '' || $nama === '') {
-            flash('danger', 'Kode PL dan Nama wajib diisi.');
+        if (!validate_code($kode, 2, 30)) {
+            http_response_code(422);
+            flash('danger', 'Format kode PL tidak sesuai (harus 2-30 karakter alfanumerik/tanda hubung).');
+        } elseif (!validate_name($nama, 2, 100)) {
+            http_response_code(422);
+            flash('danger', 'Nama PL harus diisi dengan format yang benar (2-100 karakter).');
+        } elseif ($desk !== '' && !validate_description($desk, 1, 1000)) {
+            http_response_code(422);
+            flash('danger', 'Deskripsi maksimal 1000 karakter.');
+        } elseif ($id !== 0 && !validate_id($id)) {
+            http_response_code(422);
+            flash('danger', 'ID data tidak valid.');
         } else {
             try {
                 if ($id > 0) {
@@ -32,10 +42,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
     } elseif ($action === 'delete') {
-        $id = (int)($_POST['id'] ?? 0);
-        $pdo->prepare('DELETE FROM profil_lulusan WHERE id=?')->execute([$id]);
-        log_activity('delete', 'profil_lulusan', "PL id $id dihapus");
-        flash('success', 'Profil Lulusan dihapus.');
+        $id = $_POST['id'] ?? null;
+        if (!validate_id($id)) {
+            http_response_code(422);
+            flash('danger', 'ID data tidak valid.');
+        } else {
+            $pdo->prepare('DELETE FROM profil_lulusan WHERE id=?')->execute([(int)$id]);
+            log_activity('delete', 'profil_lulusan', "PL id $id dihapus");
+            flash('success', 'Profil Lulusan dihapus.');
+        }
     }
     redirect('index.php');
 }
@@ -44,6 +59,7 @@ $q = trim($_GET['q'] ?? '');
 $where = '';
 $params = [];
 if ($q !== '') {
+    $q = mb_substr($q, 0, 100);
     $where = 'WHERE kode_pl LIKE ? OR nama_pl LIKE ? OR deskripsi LIKE ?';
     $params = ["%$q%", "%$q%", "%$q%"];
 }
@@ -58,16 +74,20 @@ $stmt->execute($params);
 $rows = $stmt->fetchAll();
 
 $edit = null;
-if (!empty($_GET['edit'])) {
-    $s = $pdo->prepare('SELECT * FROM profil_lulusan WHERE id=?');
-    $s->execute([(int)$_GET['edit']]);
-    $edit = $s->fetch();
+if (!empty($_GET['edit']) && $_GET['edit'] !== '0') {
+    if (validate_id($_GET['edit'])) {
+        $s = $pdo->prepare('SELECT * FROM profil_lulusan WHERE id=?');
+        $s->execute([(int)$_GET['edit']]);
+        $edit = $s->fetch();
+    }
 }
 $detail = null;
 if (!empty($_GET['detail'])) {
-    $s = $pdo->prepare('SELECT * FROM profil_lulusan WHERE id=?');
-    $s->execute([(int)$_GET['detail']]);
-    $detail = $s->fetch();
+    if (validate_id($_GET['detail'])) {
+        $s = $pdo->prepare('SELECT * FROM profil_lulusan WHERE id=?');
+        $s->execute([(int)$_GET['detail']]);
+        $detail = $s->fetch();
+    }
 }
 
 $page_title = 'Profil Lulusan';

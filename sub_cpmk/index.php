@@ -13,8 +13,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $mkId = (int)($_POST['mk_id'] ?? 0);
         $cpmkId = (int)($_POST['cpmk_id'] ?? 0);
         $desk = trim($_POST['deskripsi'] ?? '');
-        if (!$mkId || !$cpmkId || $desk === '') {
-            flash('danger', 'Mata kuliah, CPMK, dan deskripsi wajib diisi.');
+        if ($kode !== '' && !validate_code($kode, 2, 30)) {
+            http_response_code(422);
+            flash('danger', 'Format kode Sub-CPMK tidak sesuai (harus 2-30 karakter alfanumerik/tanda hubung).');
+        } elseif (!validate_id($mkId)) {
+            http_response_code(422);
+            flash('danger', 'Pilihan mata kuliah tidak valid.');
+        } elseif (!validate_id($cpmkId)) {
+            http_response_code(422);
+            flash('danger', 'Pilihan CPMK tidak valid.');
+        } elseif (!validate_description($desk, 1, 1000)) {
+            http_response_code(422);
+            flash('danger', 'Deskripsi Sub-CPMK wajib diisi (1-1000 karakter).');
+        } elseif ($id !== 0 && !validate_id($id)) {
+            http_response_code(422);
+            flash('danger', 'ID data tidak valid.');
         } else {
             $c = $pdo->prepare('SELECT cpl_id FROM cpmk WHERE id=?');
             $c->execute([$cpmkId]);
@@ -36,9 +49,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
     } elseif ($action === 'delete') {
-        $pdo->prepare('DELETE FROM sub_cpmk WHERE id=?')->execute([(int)($_POST['id'] ?? 0)]);
-        log_activity('delete', 'sub_cpmk', 'Sub-CPMK dihapus');
-        flash('success', 'Sub-CPMK dihapus.');
+        $id = $_POST['id'] ?? null;
+        if (!validate_id($id)) {
+            http_response_code(422);
+            flash('danger', 'ID data tidak valid.');
+        } else {
+            $pdo->prepare('DELETE FROM sub_cpmk WHERE id=?')->execute([(int)$id]);
+            log_activity('delete', 'sub_cpmk', 'Sub-CPMK dihapus');
+            flash('success', 'Sub-CPMK dihapus.');
+        }
     }
     redirect('index.php');
 }
@@ -47,8 +66,15 @@ $q = trim($_GET['q'] ?? '');
 $mkFilter = (int)($_GET['mk'] ?? 0);
 $where = [];
 $params = [];
-if ($q !== '') { $where[] = '(s.deskripsi LIKE ? OR s.kode_sub LIKE ? OR k.kode_cpmk LIKE ? OR m.nama_mk LIKE ?)'; $params = array_fill(0, 4, "%$q%"); }
-if ($mkFilter) { $where[] = 's.mk_id = ?'; $params[] = $mkFilter; }
+if ($q !== '') {
+    $q = mb_substr($q, 0, 100);
+    $where[] = '(s.deskripsi LIKE ? OR s.kode_sub LIKE ? OR k.kode_cpmk LIKE ? OR m.nama_mk LIKE ?)';
+    $params = array_fill(0, 4, "%$q%");
+}
+if ($mkFilter && validate_id($mkFilter)) {
+    $where[] = 's.mk_id = ?';
+    $params[] = $mkFilter;
+}
 $whereSql = $where ? 'WHERE ' . implode(' AND ', $where) : '';
 $s = $pdo->prepare("SELECT COUNT(*) FROM sub_cpmk s JOIN cpmk k ON k.id=s.cpmk_id JOIN mata_kuliah m ON m.id=s.mk_id $whereSql");
 $s->execute($params); $total = (int)$s->fetchColumn();
@@ -61,11 +87,20 @@ $mks = $pdo->query('SELECT * FROM mata_kuliah ORDER BY CAST(semester AS UNSIGNED
 $cpmks = $pdo->query('SELECT k.*, c.kode_cpl FROM cpmk k JOIN cpl c ON c.id=k.cpl_id ORDER BY k.kode_cpmk')->fetchAll();
 
 $edit = null;
-if (!empty($_GET['edit'])) { $s = $pdo->prepare('SELECT * FROM sub_cpmk WHERE id=?'); $s->execute([(int)$_GET['edit']]); $edit = $s->fetch(); }
+if (!empty($_GET['edit']) && $_GET['edit'] !== '0') {
+    if (validate_id($_GET['edit'])) {
+        $s = $pdo->prepare('SELECT * FROM sub_cpmk WHERE id=?');
+        $s->execute([(int)$_GET['edit']]);
+        $edit = $s->fetch();
+    }
+}
 $detail = null;
 if (!empty($_GET['detail'])) {
-    $s = $pdo->prepare('SELECT s.*, k.kode_cpmk, m.kode_mk, m.nama_mk, c.kode_cpl FROM sub_cpmk s JOIN cpmk k ON k.id=s.cpmk_id JOIN mata_kuliah m ON m.id=s.mk_id LEFT JOIN cpl c ON c.id=s.cpl_id WHERE s.id=?');
-    $s->execute([(int)$_GET['detail']]); $detail = $s->fetch();
+    if (validate_id($_GET['detail'])) {
+        $s = $pdo->prepare('SELECT s.*, k.kode_cpmk, m.kode_mk, m.nama_mk, c.kode_cpl FROM sub_cpmk s JOIN cpmk k ON k.id=s.cpmk_id JOIN mata_kuliah m ON m.id=s.mk_id LEFT JOIN cpl c ON c.id=s.cpl_id WHERE s.id=?');
+        $s->execute([(int)$_GET['detail']]);
+        $detail = $s->fetch();
+    }
 }
 
 $page_title = 'Sub-CPMK';

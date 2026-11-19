@@ -13,27 +13,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $nama = trim($_POST['nama_bk'] ?? '');
         $desk = trim($_POST['deskripsi'] ?? '');
         $acuan = trim($_POST['acuan'] ?? '');
-        if ($kode === '' || $nama === '') {
-            flash('danger', 'Kode dan nama Bahan Kajian wajib diisi.');
-        } else {
-            try {
-                if ($id > 0) {
-                    $pdo->prepare('UPDATE bahan_kajian SET kode_bk=?, nama_bk=?, deskripsi=?, acuan=? WHERE id=?')
-                        ->execute([$kode, $nama, $desk ?: null, $acuan ?: null, $id]);
-                    log_activity('update', 'bahan_kajian', "BK $kode diperbarui");
-                    flash('success', 'Bahan Kajian diperbarui.');
-                } else {
-                    $pdo->prepare('INSERT INTO bahan_kajian (kode_bk, nama_bk, deskripsi, acuan) VALUES (?,?,?,?)')
-                        ->execute([$kode, $nama, $desk ?: null, $acuan ?: null]);
-                    log_activity('create', 'bahan_kajian', "BK $kode ditambahkan");
-                    flash('success', 'Bahan Kajian ditambahkan.');
-                }
-            } catch (PDOException $e) {
-                flash('danger', 'Gagal menyimpan: kode BK mungkin sudah dipakai.');
+
+        if ($id < 0 || ($id > 0 && !validate_id($id))) {
+            http_response_code(422);
+            flash('danger', 'ID Bahan Kajian tidak valid.');
+            redirect('index.php');
+        }
+        if (!validate_code($kode, 2, 30)) {
+            http_response_code(422);
+            flash('danger', 'Kode Bahan Kajian tidak valid (2-30 karakter alfanumerik/tanda hubung/garis bawah).');
+            redirect('index.php');
+        }
+        if (!validate_name($nama, 2, 200)) {
+            http_response_code(422);
+            flash('danger', 'Nama Bahan Kajian tidak valid (2-200 karakter).');
+            redirect('index.php');
+        }
+        if ($desk !== '' && !validate_description($desk, 1, 1000)) {
+            http_response_code(422);
+            flash('danger', 'Deskripsi Bahan Kajian tidak valid (maksimal 1000 karakter).');
+            redirect('index.php');
+        }
+        if ($acuan !== '' && (strlen($acuan) > 50 || preg_match('/[\x00-\x1f\x7f<>&"\'`]/', $acuan))) {
+            http_response_code(422);
+            flash('danger', 'Acuan Bahan Kajian tidak valid (maksimal 50 karakter alfanumerik).');
+            redirect('index.php');
+        }
+
+        try {
+            if ($id > 0) {
+                $pdo->prepare('UPDATE bahan_kajian SET kode_bk=?, nama_bk=?, deskripsi=?, acuan=? WHERE id=?')
+                    ->execute([$kode, $nama, $desk ?: null, $acuan ?: null, $id]);
+                log_activity('update', 'bahan_kajian', "BK $kode diperbarui");
+                flash('success', 'Bahan Kajian diperbarui.');
+            } else {
+                $pdo->prepare('INSERT INTO bahan_kajian (kode_bk, nama_bk, deskripsi, acuan) VALUES (?,?,?,?)')
+                    ->execute([$kode, $nama, $desk ?: null, $acuan ?: null]);
+                log_activity('create', 'bahan_kajian', "BK $kode ditambahkan");
+                flash('success', 'Bahan Kajian ditambahkan.');
             }
+        } catch (PDOException $e) {
+            flash('danger', 'Gagal menyimpan: kode BK mungkin sudah dipakai.');
         }
     } elseif ($action === 'delete') {
-        $pdo->prepare('DELETE FROM bahan_kajian WHERE id=?')->execute([(int)($_POST['id'] ?? 0)]);
+        $id = (int)($_POST['id'] ?? 0);
+        if (!validate_id($id)) {
+            http_response_code(422);
+            flash('danger', 'ID Bahan Kajian tidak valid.');
+            redirect('index.php');
+        }
+        $pdo->prepare('DELETE FROM bahan_kajian WHERE id=?')->execute([$id]);
         log_activity('delete', 'bahan_kajian', 'BK dihapus');
         flash('success', 'Bahan Kajian dihapus.');
     }

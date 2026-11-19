@@ -13,8 +13,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $kode = strtoupper(trim($_POST['kode_cpl'] ?? ''));
         $desk = trim($_POST['deskripsi'] ?? '');
         $domain = $_POST['domain'] ?? '';
-        if ($kode === '' || $desk === '' || !isset($domains[$domain])) {
-            flash('danger', 'Kode, deskripsi, dan domain wajib diisi dengan benar.');
+        if (!validate_code($kode, 2, 30)) {
+            http_response_code(422);
+            flash('danger', 'Format kode CPL tidak sesuai (harus 2-30 karakter alfanumerik/tanda hubung).');
+        } elseif (!validate_description($desk, 1, 1000)) {
+            http_response_code(422);
+            flash('danger', 'Deskripsi CPL wajib diisi (1-1000 karakter).');
+        } elseif (!isset($domains[$domain])) {
+            http_response_code(422);
+            flash('danger', 'Domain CPL tidak valid.');
+        } elseif ($id !== 0 && !validate_id($id)) {
+            http_response_code(422);
+            flash('danger', 'ID data tidak valid.');
         } else {
             try {
                 if ($id > 0) {
@@ -31,9 +41,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
     } elseif ($action === 'delete') {
-        $pdo->prepare('DELETE FROM cpl WHERE id=?')->execute([(int)($_POST['id'] ?? 0)]);
-        log_activity('delete', 'cpl', 'CPL dihapus');
-        flash('success', 'CPL dihapus.');
+        $id = $_POST['id'] ?? null;
+        if (!validate_id($id)) {
+            http_response_code(422);
+            flash('danger', 'ID data tidak valid.');
+        } else {
+            $pdo->prepare('DELETE FROM cpl WHERE id=?')->execute([(int)$id]);
+            log_activity('delete', 'cpl', 'CPL dihapus');
+            flash('success', 'CPL dihapus.');
+        }
     }
     redirect('index.php');
 }
@@ -42,8 +58,16 @@ $q = trim($_GET['q'] ?? '');
 $dom = trim($_GET['domain'] ?? '');
 $where = [];
 $params = [];
-if ($q !== '') { $where[] = '(kode_cpl LIKE ? OR deskripsi LIKE ?)'; $params[] = "%$q%"; $params[] = "%$q%"; }
-if ($dom !== '') { $where[] = 'domain = ?'; $params[] = $dom; }
+if ($q !== '') {
+    $q = mb_substr($q, 0, 100);
+    $where[] = '(kode_cpl LIKE ? OR deskripsi LIKE ?)';
+    $params[] = "%$q%";
+    $params[] = "%$q%";
+}
+if ($dom !== '' && isset($domains[$dom])) {
+    $where[] = 'domain = ?';
+    $params[] = $dom;
+}
 $whereSql = $where ? 'WHERE ' . implode(' AND ', $where) : '';
 $s = $pdo->prepare("SELECT COUNT(*) FROM cpl $whereSql");
 $s->execute($params);
@@ -54,12 +78,20 @@ $stmt->execute($params);
 $rows = $stmt->fetchAll();
 
 $edit = null;
-if (!empty($_GET['edit'])) {
-    $s = $pdo->prepare('SELECT * FROM cpl WHERE id=?'); $s->execute([(int)$_GET['edit']]); $edit = $s->fetch();
+if (!empty($_GET['edit']) && $_GET['edit'] !== '0') {
+    if (validate_id($_GET['edit'])) {
+        $s = $pdo->prepare('SELECT * FROM cpl WHERE id=?');
+        $s->execute([(int)$_GET['edit']]);
+        $edit = $s->fetch();
+    }
 }
 $detail = null;
 if (!empty($_GET['detail'])) {
-    $s = $pdo->prepare('SELECT * FROM cpl WHERE id=?'); $s->execute([(int)$_GET['detail']]); $detail = $s->fetch();
+    if (validate_id($_GET['detail'])) {
+        $s = $pdo->prepare('SELECT * FROM cpl WHERE id=?');
+        $s->execute([(int)$_GET['detail']]);
+        $detail = $s->fetch();
+    }
 }
 
 $domainBadge = ['S' => 'success', 'P' => 'primary', 'KU' => 'warning', 'KK' => 'purple'];

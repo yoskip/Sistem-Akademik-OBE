@@ -2,7 +2,13 @@
 require_once __DIR__ . '/../includes/auth.php';
 
 $pdo = db();
-$count = fn(string $t) => (int)$pdo->query("SELECT COUNT(*) FROM $t")->fetchColumn();
+$count = function (string $t) use ($pdo): int {
+    $allowed = ['profil_lulusan', 'cpl', 'bahan_kajian', 'mata_kuliah', 'cpmk', 'sub_cpmk'];
+    if (!in_array($t, $allowed, true)) {
+        return 0;
+    }
+    return (int)$pdo->query("SELECT COUNT(*) FROM `$t`")->fetchColumn();
+};
 
 $stats = [
     'pl'    => ['label' => 'Profil Lulusan', 'value' => $count('profil_lulusan'), 'icon' => 'bi-person-badge', 'soft' => 'bg-soft-blue'],

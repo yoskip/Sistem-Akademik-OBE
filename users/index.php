@@ -15,9 +15,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $roleId = (int)($_POST['role_id'] ?? 0);
         $password = (string)($_POST['password'] ?? '');
         $aktif = isset($_POST['aktif']) ? 1 : 0;
-        if ($nama === '' || $username === '' || !$roleId) {
-            flash('danger', 'Nama, username, dan role wajib diisi.');
+        if (!validate_name($nama, 2, 100)) {
+            http_response_code(422);
+            flash('danger', 'Nama harus diisi dengan format yang benar (2-100 karakter, huruf, spasi, tanda hubung, atau apostrof).');
+        } elseif (!validate_username($username)) {
+            http_response_code(422);
+            flash('danger', 'Username / NPM harus terdiri dari 10 digit angka atau alfanumerik 3-50 karakter.');
+        } elseif (!validate_id($roleId) || !in_array($roleId, [1, 2, 3], true)) {
+            http_response_code(422);
+            flash('danger', 'Role pengguna tidak valid.');
+        } elseif ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            http_response_code(422);
+            flash('danger', 'Format email tidak valid.');
+        } elseif ($id !== 0 && !validate_id($id)) {
+            http_response_code(422);
+            flash('danger', 'ID data tidak valid.');
         } elseif ($id === 0 && strlen($password) < 6) {
+            http_response_code(422);
             flash('danger', 'Password minimal 6 karakter.');
         } else {
             try {
@@ -38,27 +52,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     log_activity('create', 'users', "Pengguna $username ditambahkan");
                     flash('success', 'Pengguna ditambahkan.');
                 }
+                redirect('index.php');
             } catch (PDOException $e) {
                 flash('danger', 'Gagal menyimpan: username mungkin sudah dipakai.');
             }
         }
     } elseif ($action === 'delete') {
-        $id = (int)($_POST['id'] ?? 0);
-        if ($id === (int)$me['id']) {
+        $id = $_POST['id'] ?? null;
+        if (!validate_id($id)) {
+            http_response_code(422);
+            flash('danger', 'ID data tidak valid.');
+        } elseif ((int)$id === (int)$me['id']) {
             flash('danger', 'Anda tidak dapat menghapus akun sendiri.');
         } else {
-            $pdo->prepare('DELETE FROM users WHERE id=?')->execute([$id]);
+            $pdo->prepare('DELETE FROM users WHERE id=?')->execute([(int)$id]);
             log_activity('delete', 'users', "Pengguna id $id dihapus");
             flash('success', 'Pengguna dihapus.');
+            redirect('index.php');
         }
     }
-    redirect('index.php');
 }
 
 $q = trim($_GET['q'] ?? '');
 $where = '';
 $params = [];
-if ($q !== '') { $where = 'WHERE u.nama LIKE ? OR u.username LIKE ? OR u.email LIKE ?'; $params = array_fill(0, 3, "%$q%"); }
+if ($q !== '') {
+    $q = mb_substr($q, 0, 100);
+    $where = 'WHERE u.nama LIKE ? OR u.username LIKE ? OR u.email LIKE ?';
+    $params = array_fill(0, 3, "%$q%");
+}
 $s = $pdo->prepare("SELECT COUNT(*) FROM users u $where"); $s->execute($params); $total = (int)$s->fetchColumn();
 [$limit, $offset, , $page, $pages] = paginate($total, 10);
 $stmt = $pdo->prepare("SELECT u.*, r.nama AS role FROM users u JOIN roles r ON r.id=u.role_id $where ORDER BY u.nama LIMIT $limit OFFSET $offset");
@@ -66,7 +88,13 @@ $stmt->execute($params); $rows = $stmt->fetchAll();
 $roles = $pdo->query('SELECT * FROM roles ORDER BY id')->fetchAll();
 
 $edit = null;
-if (!empty($_GET['edit'])) { $s = $pdo->prepare('SELECT * FROM users WHERE id=?'); $s->execute([(int)$_GET['edit']]); $edit = $s->fetch(); }
+if (!empty($_GET['edit']) && $_GET['edit'] !== '0') {
+    if (validate_id($_GET['edit'])) {
+        $s = $pdo->prepare('SELECT * FROM users WHERE id=?');
+        $s->execute([(int)$_GET['edit']]);
+        $edit = $s->fetch();
+    }
+}
 
 $page_title = 'Manajemen Pengguna';
 $page_subtitle = 'Kelola akun dan hak akses pengguna';

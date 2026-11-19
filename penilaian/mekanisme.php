@@ -16,8 +16,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $instrumen = trim($_POST['instrumen'] ?? '');
         $kriteria = trim($_POST['kriteria'] ?? '');
         $bobot = trim($_POST['bobot'] ?? '');
-        if (!$mkId || $tahap === '') {
-            flash('danger', 'Mata kuliah dan tahap wajib diisi.');
+        if (!validate_id($mkId)) {
+            http_response_code(422);
+            flash('danger', 'Mata kuliah wajib dipilih.');
+        } elseif ($cpmkId && !validate_id($cpmkId)) {
+            http_response_code(422);
+            flash('danger', 'Pilihan CPMK tidak valid.');
+        } elseif ($tahap === '' || mb_strlen($tahap) > 1000) {
+            http_response_code(422);
+            flash('danger', 'Tahap penilaian wajib diisi (1-1000 karakter).');
+        } elseif ($id !== 0 && !validate_id($id)) {
+            http_response_code(422);
+            flash('danger', 'ID data tidak valid.');
         } else {
             $m = $pdo->prepare('SELECT kode_mk FROM mata_kuliah WHERE id=?'); $m->execute([$mkId]); $mkRaw = (string)$m->fetchColumn();
             $kodeCpmk = null; $cplId = null; $cplRaw = null;
@@ -41,9 +51,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } catch (PDOException $e) { flash('danger', 'Gagal menyimpan data.'); }
         }
     } elseif ($action === 'delete') {
-        $pdo->prepare('DELETE FROM mekanisme_penilaian WHERE id=?')->execute([(int)($_POST['id'] ?? 0)]);
-        log_activity('delete', 'mekanisme', 'Mekanisme dihapus');
-        flash('success', 'Data dihapus.');
+        $id = $_POST['id'] ?? null;
+        if (!validate_id($id)) {
+            http_response_code(422);
+            flash('danger', 'ID data tidak valid.');
+        } else {
+            $pdo->prepare('DELETE FROM mekanisme_penilaian WHERE id=?')->execute([(int)$id]);
+            log_activity('delete', 'mekanisme', 'Mekanisme dihapus');
+            flash('success', 'Data dihapus.');
+        }
     }
     redirect('mekanisme.php');
 }

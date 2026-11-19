@@ -78,7 +78,109 @@ start_secure_session();
 
 function e($value): string
 {
-    return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
+    return htmlspecialchars((string)$value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+}
+
+/**
+ * =====================================================================
+ * FUNGSI VALIDASI INPUT (ALLOWLIST & SERVER-SIDE VALIDATION)
+ * =====================================================================
+ */
+
+/** Validasi NPM: string tepat 10 digit angka (0-9) */
+function validate_npm(mixed $npm): bool
+{
+    if (!is_string($npm) && !is_numeric($npm)) {
+        return false;
+    }
+    return (bool)preg_match('/^[0-9]{10}$/', (string)$npm);
+}
+
+/** Validasi nama pengguna: string 2–100 karakter, huruf, spasi, tanda hubung, apostrof, titik, koma (gelar akademis) */
+function validate_name(mixed $name, int $min = 2, int $max = 100): bool
+{
+    if (!is_string($name)) {
+        return false;
+    }
+    $trimmed = trim($name);
+    $len = mb_strlen($trimmed, 'UTF-8');
+    if ($len < $min || $len > $max) {
+        return false;
+    }
+    return (bool)preg_match('/^[\p{L}\s\'\-\.,]+$/u', $trimmed);
+}
+
+/** Validasi ID data: integer positif minimal 1 */
+function validate_id(mixed $id): bool
+{
+    if (is_int($id)) {
+        return $id >= 1;
+    }
+    if (is_string($id) && ctype_digit($id)) {
+        return (int)$id >= 1 && (string)(int)$id === $id;
+    }
+    return false;
+}
+
+/** Validasi kode PL / CPL / CPMK / Sub-CPMK / BK / MK: string 2–30 karakter, huruf, angka, tanda hubung, underscore */
+function validate_code(mixed $code, int $min = 2, int $max = 30): bool
+{
+    if (!is_string($code)) {
+        return false;
+    }
+    $trimmed = trim($code);
+    $len = strlen($trimmed);
+    if ($len < $min || $len > $max) {
+        return false;
+    }
+    return (bool)preg_match('/^[a-zA-Z0-9_\-]+$/', $trimmed);
+}
+
+/** Validasi deskripsi capaian: string 1–1000 karakter, tidak boleh kosong */
+function validate_description(mixed $desc, int $min = 1, int $max = 1000): bool
+{
+    if (!is_string($desc)) {
+        return false;
+    }
+    $trimmed = trim($desc);
+    $len = mb_strlen($trimmed, 'UTF-8');
+    return $len >= $min && $len <= $max;
+}
+
+/** Validasi username: NPM 10 digit ATAU string alfanumerik 3–50 karakter */
+function validate_username(mixed $username): bool
+{
+    if (!is_string($username)) {
+        return false;
+    }
+    $trimmed = trim($username);
+    if (validate_npm($trimmed)) {
+        return true;
+    }
+    return (bool)preg_match('/^[a-zA-Z0-9_\-]{3,50}$/', $trimmed);
+}
+
+/** Validasi identitas login: NPM (10 digit), username (3-50 char), atau email valid */
+function validate_login_identity(mixed $identity): bool
+{
+    if (!is_string($identity)) {
+        return false;
+    }
+    $trimmed = trim($identity);
+    if ($trimmed === '') {
+        return false;
+    }
+    // Tolak karakter berbahaya SQL injection / whitespace internal
+    if (preg_match('/[\s\'"=\-;]/', $trimmed)) {
+        return false;
+    }
+    if (validate_npm($trimmed)) {
+        return true;
+    }
+    if (validate_username($trimmed)) {
+        return true;
+    }
+    return filter_var($trimmed, FILTER_VALIDATE_EMAIL) !== false;
 }
 
 function redirect(string $path): void
@@ -366,11 +468,24 @@ function log_activity(string $aksi, string $modul, string $keterangan = ''): voi
     ]);
 }
 
-/** Ambil nilai map kode -> id untuk tabel referensi */
+/** Ambil nilai map kode -> id untuk tabel referensi dengan proteksi allowlist */
 function id_map(string $table, string $kodeCol): array
 {
+    $allowed = [
+        'cpl'            => 'kode_cpl',
+        'profil_lulusan' => 'kode_pl',
+        'bahan_kajian'   => 'kode_bk',
+        'mata_kuliah'    => 'kode_mk',
+        'cpmk'           => 'kode_cpmk',
+    ];
+    if (!isset($allowed[$table]) || $allowed[$table] !== $kodeCol) {
+        throw new InvalidArgumentException("Tabel atau kolom referensi tidak diizinkan: $table.$kodeCol");
+    }
+
     $map = [];
-    foreach (db()->query("SELECT id, $kodeCol FROM $table") as $row) {
+    $stmt = db()->prepare("SELECT id, `$kodeCol` FROM `$table`");
+    $stmt->execute();
+    foreach ($stmt->fetchAll() as $row) {
         $map[$row[$kodeCol]] = (int)$row['id'];
     }
     return $map;

@@ -13,8 +13,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $mkId = (int)($_POST['mk_id'] ?? 0);
         $cpmkId = (int)($_POST['cpmk_id'] ?? 0);
         $versi = trim($_POST['versi'] ?? '18');
-        if (!$mkId) {
+        if (!validate_id($mkId)) {
+            http_response_code(422);
             flash('danger', 'Mata kuliah wajib dipilih.');
+        } elseif ($cpmkId && !validate_id($cpmkId)) {
+            http_response_code(422);
+            flash('danger', 'Pilihan CPMK tidak valid.');
+        } elseif ($id !== 0 && !validate_id($id)) {
+            http_response_code(422);
+            flash('danger', 'ID data tidak valid.');
         } else {
             $m = $pdo->prepare('SELECT kode_mk FROM mata_kuliah WHERE id=?'); $m->execute([$mkId]); $mkRaw = (string)$m->fetchColumn();
             $kodeCpmk = null; $cplId = null; $cplRaw = null;
@@ -23,10 +30,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $kodeCpmk = $cr['kode_cpmk'] ?? null; $cplId = $cr['cpl_id'] ?? null;
                 if ($cplId) { $q = $pdo->prepare('SELECT kode_cpl FROM cpl WHERE id=?'); $q->execute([$cplId]); $cplRaw = $q->fetchColumn(); }
             }
+            $allowedBobotCols = [
+                'versi', 'mk_id', 'kode_mk_raw', 'cpmk_id', 'kode_cpmk_raw', 'cpl_id', 'kode_cpl_raw',
+                'mbkm', 'partisipasi', 'observasi', 'unjuk_kerja', 'tes_uts', 'tes_uas', 'tes_lisan', 'total'
+            ];
             $cols = ['versi', 'mk_id', 'kode_mk_raw', 'cpmk_id', 'kode_cpmk_raw', 'cpl_id', 'kode_cpl_raw'];
             $vals = [$versi, $mkId, $mkRaw, $cpmkId ?: null, $kodeCpmk, $cplId, $cplRaw];
             $totalBobot = 0;
             foreach ($fields as $f => $lbl) {
+                if (!in_array($f, $allowedBobotCols, true)) continue;
                 $v = ($_POST[$f] ?? '') !== '' ? (float)$_POST[$f] : null;
                 $cols[] = $f; $vals[] = $v;
                 if ($v !== null) $totalBobot += $v;
@@ -34,22 +46,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $cols[] = 'total'; $vals[] = $totalBobot;
             try {
                 if ($id > 0) {
-                    $set = implode(',', array_map(fn($c) => "$c=?", array_slice($cols, 1)));
+                    $set = implode(',', array_map(fn($c) => "`$c`=?", array_slice($cols, 1)));
                     $pdo->prepare("UPDATE bobot_penilaian SET $set WHERE id=?")->execute(array_merge(array_slice($vals, 1), [$id]));
                     log_activity('update', 'bobot', "Bobot penilaian $mkRaw diperbarui");
                     flash('success', 'Bobot penilaian diperbarui.');
                 } else {
+                    $escapedCols = implode(',', array_map(fn($c) => "`$c`", $cols));
                     $ph = implode(',', array_fill(0, count($cols), '?'));
-                    $pdo->prepare("INSERT INTO bobot_penilaian (" . implode(',', $cols) . ") VALUES ($ph)")->execute($vals);
+                    $pdo->prepare("INSERT INTO bobot_penilaian ($escapedCols) VALUES ($ph)")->execute($vals);
                     log_activity('create', 'bobot', "Bobot penilaian $mkRaw ditambahkan");
                     flash('success', 'Bobot penilaian ditambahkan.');
                 }
             } catch (PDOException $e) { flash('danger', 'Gagal menyimpan bobot penilaian.'); }
         }
     } elseif ($action === 'delete') {
-        $pdo->prepare('DELETE FROM bobot_penilaian WHERE id=?')->execute([(int)($_POST['id'] ?? 0)]);
-        log_activity('delete', 'bobot', 'Bobot penilaian dihapus');
-        flash('success', 'Data dihapus.');
+        $id = $_POST['id'] ?? null;
+        if (!validate_id($id)) {
+            http_response_code(422);
+            flash('danger', 'ID data tidak valid.');
+        } else {
+            $pdo->prepare('DELETE FROM bobot_penilaian WHERE id=?')->execute([(int)$id]);
+            log_activity('delete', 'bobot', 'Bobot penilaian dihapus');
+            flash('success', 'Data dihapus.');
+        }
     }
     redirect('bobot.php');
 }

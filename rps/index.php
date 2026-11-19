@@ -18,25 +18,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $teknik = trim($_POST['teknik'] ?? '');
         $catatan = trim($_POST['catatan'] ?? '');
         $urutan = (int)($_POST['urutan'] ?? 0);
-        if (!$mkId || $dosen === '') { flash('danger', 'Mata kuliah dan dosen wajib diisi.'); }
-        else {
-            $m = $pdo->prepare('SELECT kode_mk FROM mata_kuliah WHERE id=?'); $m->execute([$mkId]); $mkRaw = (string)$m->fetchColumn();
-            try {
-                if ($id > 0) {
-                    $pdo->prepare('UPDATE rps SET mk_id=?, kode_mk_raw=?, semester=?, dosen=?, cpl=?, cpmk=?, bobot=?, teknik=?, catatan=?, urutan=? WHERE id=?')
-                        ->execute([$mkId, $mkRaw, $semester ?: null, $dosen, $cpl ?: null, $cpmk ?: null, $bobot ?: null, $teknik ?: null, $catatan ?: null, $urutan, $id]);
-                    log_activity('update', 'rps', "RPS $mkRaw diperbarui");
-                    flash('success', 'RPS diperbarui.');
-                } else {
-                    $pdo->prepare('INSERT INTO rps (mk_id, kode_mk_raw, semester, dosen, cpl, cpmk, bobot, teknik, catatan, urutan) VALUES (?,?,?,?,?,?,?,?,?,?)')
-                        ->execute([$mkId, $mkRaw, $semester ?: null, $dosen, $cpl ?: null, $cpmk ?: null, $bobot ?: null, $teknik ?: null, $catatan ?: null, $urutan]);
-                    log_activity('create', 'rps', "RPS $mkRaw ditambahkan");
-                    flash('success', 'RPS ditambahkan.');
-                }
-            } catch (PDOException $e) { flash('danger', 'Gagal menyimpan RPS.'); }
+
+        if ($id < 0 || ($id > 0 && !validate_id($id))) {
+            http_response_code(422);
+            flash('danger', 'ID RPS tidak valid.');
+            redirect('index.php');
         }
+        if (!validate_id($mkId)) {
+            http_response_code(422);
+            flash('danger', 'Mata kuliah wajib dipilih dengan ID valid.');
+            redirect('index.php');
+        }
+        if (!validate_name($dosen, 2, 200)) {
+            http_response_code(422);
+            flash('danger', 'Nama Dosen tidak valid (2-200 karakter).');
+            redirect('index.php');
+        }
+        if ($catatan !== '' && !validate_description($catatan, 1, 1000)) {
+            http_response_code(422);
+            flash('danger', 'Catatan tidak valid (maksimal 1000 karakter).');
+            redirect('index.php');
+        }
+
+        $m = $pdo->prepare('SELECT kode_mk FROM mata_kuliah WHERE id=?');
+        $m->execute([$mkId]);
+        $mkRaw = (string)$m->fetchColumn();
+        if (!$mkRaw) {
+            http_response_code(422);
+            flash('danger', 'Mata kuliah yang dipilih tidak ditemukan.');
+            redirect('index.php');
+        }
+
+        try {
+            if ($id > 0) {
+                $pdo->prepare('UPDATE rps SET mk_id=?, kode_mk_raw=?, semester=?, dosen=?, cpl=?, cpmk=?, bobot=?, teknik=?, catatan=?, urutan=? WHERE id=?')
+                    ->execute([$mkId, $mkRaw, $semester ?: null, $dosen, $cpl ?: null, $cpmk ?: null, $bobot ?: null, $teknik ?: null, $catatan ?: null, $urutan, $id]);
+                log_activity('update', 'rps', "RPS $mkRaw diperbarui");
+                flash('success', 'RPS diperbarui.');
+            } else {
+                $pdo->prepare('INSERT INTO rps (mk_id, kode_mk_raw, semester, dosen, cpl, cpmk, bobot, teknik, catatan, urutan) VALUES (?,?,?,?,?,?,?,?,?,?)')
+                    ->execute([$mkId, $mkRaw, $semester ?: null, $dosen, $cpl ?: null, $cpmk ?: null, $bobot ?: null, $teknik ?: null, $catatan ?: null, $urutan]);
+                log_activity('create', 'rps', "RPS $mkRaw ditambahkan");
+                flash('success', 'RPS ditambahkan.');
+            }
+        } catch (PDOException $e) { flash('danger', 'Gagal menyimpan RPS.'); }
     } elseif ($action === 'delete') {
-        $pdo->prepare('DELETE FROM rps WHERE id=?')->execute([(int)($_POST['id'] ?? 0)]);
+        $id = (int)($_POST['id'] ?? 0);
+        if (!validate_id($id)) {
+            http_response_code(422);
+            flash('danger', 'ID RPS tidak valid.');
+            redirect('index.php');
+        }
+        $pdo->prepare('DELETE FROM rps WHERE id=?')->execute([$id]);
         log_activity('delete', 'rps', 'RPS dihapus');
         flash('success', 'RPS dihapus.');
     }

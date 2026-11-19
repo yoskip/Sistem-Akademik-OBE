@@ -9,7 +9,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     if ($action === 'save') {
         $id = (int)($_POST['id'] ?? 0);
-        $kode = trim($_POST['kode_mk'] ?? '');
+        $kode = strtoupper(trim($_POST['kode_mk'] ?? ''));
         $nama = trim($_POST['nama_mk'] ?? '');
         $semester = trim($_POST['semester'] ?? '');
         $teori = (float)($_POST['sks_teori'] ?? 0);
@@ -17,28 +17,67 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $lap = (float)($_POST['praktik_lapangan'] ?? 0);
         $kelompok = trim($_POST['kelompok'] ?? '');
         $internal = trim($_POST['kode_internal'] ?? '');
+
+        if ($id < 0 || ($id > 0 && !validate_id($id))) {
+            http_response_code(422);
+            flash('danger', 'ID Mata Kuliah tidak valid.');
+            redirect('index.php');
+        }
+        if (!validate_code($kode, 2, 30)) {
+            http_response_code(422);
+            flash('danger', 'Kode Mata Kuliah tidak valid (2-30 karakter alfanumerik/tanda hubung/garis bawah).');
+            redirect('index.php');
+        }
+        if (!validate_name($nama, 2, 200)) {
+            http_response_code(422);
+            flash('danger', 'Nama Mata Kuliah tidak valid (2-200 karakter).');
+            redirect('index.php');
+        }
+        if ($semester === '' || strlen($semester) > 10 || !preg_match('/^[a-zA-Z0-9\s\-]{1,10}$/', $semester)) {
+            http_response_code(422);
+            flash('danger', 'Semester tidak valid (1-10 karakter alfanumerik).');
+            redirect('index.php');
+        }
+        if ($teori < 0 || $teori > 20 || $praktik < 0 || $praktik > 20 || $lap < 0 || $lap > 20) {
+            http_response_code(422);
+            flash('danger', 'Nilai SKS tidak valid (harus antara 0 - 20).');
+            redirect('index.php');
+        }
+        if ($kelompok !== '' && (strlen($kelompok) > 60 || preg_match('/[\x00-\x1f\x7f<>&"\'`]/', $kelompok))) {
+            http_response_code(422);
+            flash('danger', 'Kelompok Mata Kuliah tidak valid.');
+            redirect('index.php');
+        }
+        if ($internal !== '' && !validate_code($internal, 1, 20)) {
+            http_response_code(422);
+            flash('danger', 'Kode Internal tidak valid (maksimal 20 karakter alfanumerik).');
+            redirect('index.php');
+        }
+
         $sks = $teori + $praktik + $lap;
-        if ($kode === '' || $nama === '' || $semester === '') {
-            flash('danger', 'Kode, nama, dan semester wajib diisi.');
-        } else {
-            try {
-                if ($id > 0) {
-                    $pdo->prepare('UPDATE mata_kuliah SET kode_mk=?, nama_mk=?, sks=?, sks_teori=?, praktik=?, praktik_lapangan=?, semester=?, kelompok=?, kode_internal=? WHERE id=?')
-                        ->execute([$kode, $nama, $sks, $teori, $praktik, $lap, $semester, $kelompok ?: null, $internal ?: null, $id]);
-                    log_activity('update', 'mata_kuliah', "MK $kode diperbarui");
-                    flash('success', 'Mata Kuliah diperbarui.');
-                } else {
-                    $pdo->prepare('INSERT INTO mata_kuliah (kode_mk, nama_mk, sks, sks_teori, praktik, praktik_lapangan, semester, kelompok, kode_internal) VALUES (?,?,?,?,?,?,?,?,?)')
-                        ->execute([$kode, $nama, $sks, $teori, $praktik, $lap, $semester, $kelompok ?: null, $internal ?: null]);
-                    log_activity('create', 'mata_kuliah', "MK $kode ditambahkan");
-                    flash('success', 'Mata Kuliah ditambahkan.');
-                }
-            } catch (PDOException $e) {
-                flash('danger', 'Gagal menyimpan: kode MK mungkin sudah dipakai.');
+        try {
+            if ($id > 0) {
+                $pdo->prepare('UPDATE mata_kuliah SET kode_mk=?, nama_mk=?, sks=?, sks_teori=?, praktik=?, praktik_lapangan=?, semester=?, kelompok=?, kode_internal=? WHERE id=?')
+                    ->execute([$kode, $nama, $sks, $teori, $praktik, $lap, $semester, $kelompok ?: null, $internal ?: null, $id]);
+                log_activity('update', 'mata_kuliah', "MK $kode diperbarui");
+                flash('success', 'Mata Kuliah diperbarui.');
+            } else {
+                $pdo->prepare('INSERT INTO mata_kuliah (kode_mk, nama_mk, sks, sks_teori, praktik, praktik_lapangan, semester, kelompok, kode_internal) VALUES (?,?,?,?,?,?,?,?,?)')
+                    ->execute([$kode, $nama, $sks, $teori, $praktik, $lap, $semester, $kelompok ?: null, $internal ?: null]);
+                log_activity('create', 'mata_kuliah', "MK $kode ditambahkan");
+                flash('success', 'Mata Kuliah ditambahkan.');
             }
+        } catch (PDOException $e) {
+            flash('danger', 'Gagal menyimpan: kode MK mungkin sudah dipakai.');
         }
     } elseif ($action === 'delete') {
-        $pdo->prepare('DELETE FROM mata_kuliah WHERE id=?')->execute([(int)($_POST['id'] ?? 0)]);
+        $id = (int)($_POST['id'] ?? 0);
+        if (!validate_id($id)) {
+            http_response_code(422);
+            flash('danger', 'ID Mata Kuliah tidak valid.');
+            redirect('index.php');
+        }
+        $pdo->prepare('DELETE FROM mata_kuliah WHERE id=?')->execute([$id]);
         log_activity('delete', 'mata_kuliah', 'MK dihapus');
         flash('success', 'Mata Kuliah dihapus.');
     }

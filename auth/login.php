@@ -17,7 +17,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $identityHash = login_identity_hash($identity);
     $ip = client_ip();
 
-    if (is_login_blocked($identityHash, $ip)) {
+    if ($identity === '' || !validate_login_identity($identity)) {
+        http_response_code(422);
+        $error = 'Format NPM, username, atau email tidak valid.';
+    } elseif (is_login_blocked($identityHash, $ip)) {
         // Tolak sebelum query user/password_verify dijalankan.
         http_response_code(429);
         header('Retry-After: ' . (LOGIN_WINDOW_MINUTES * 60));
