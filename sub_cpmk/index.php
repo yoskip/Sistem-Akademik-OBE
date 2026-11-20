@@ -5,7 +5,7 @@ $can = can_manage_cpmk();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
-    if (!$can) { http_response_code(403); die('Akses ditolak'); }
+    if (!$can) { deny_access(); }
     $action = $_POST['action'] ?? '';
     if ($action === 'save') {
         $id = (int)($_POST['id'] ?? 0);
@@ -44,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     log_activity('create', 'sub_cpmk', 'Sub-CPMK ditambahkan');
                     flash('success', 'Sub-CPMK ditambahkan.');
                 }
-            } catch (PDOException $e) {
+            } catch (PDOException $e) { obe_log_database_failure($e);
                 flash('danger', 'Gagal menyimpan Sub-CPMK.');
             }
         }

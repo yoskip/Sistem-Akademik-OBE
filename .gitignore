@@ -7,6 +7,9 @@ config/secrets.php
 # Logs & temporary files
 *.log
 logs/
+!storage/logs/
+storage/logs/*
+!storage/logs/.htaccess
 tmp/
 tests/*.log
 

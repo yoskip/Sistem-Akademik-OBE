@@ -5,7 +5,7 @@ $can = can_manage_cpmk();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
-    if (!$can) { http_response_code(403); die('Akses ditolak'); }
+    if (!$can) { deny_access(); }
     $action = $_POST['action'] ?? '';
     if ($action === 'save') {
         $id = (int)($_POST['id'] ?? 0);
@@ -61,7 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 log_activity('create', 'rps', "RPS $mkRaw ditambahkan");
                 flash('success', 'RPS ditambahkan.');
             }
-        } catch (PDOException $e) { flash('danger', 'Gagal menyimpan RPS.'); }
+        } catch (PDOException $e) { obe_log_database_failure($e); flash('danger', 'Gagal menyimpan RPS.'); }
     } elseif ($action === 'delete') {
         $id = (int)($_POST['id'] ?? 0);
         if (!validate_id($id)) {

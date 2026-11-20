@@ -1,0 +1,7 @@
+Potongan security.log dari hasil pengujian (NPM sudah disamarkan oleh aplikasi, bukan disunting manual):
+
+{"time":"2026-11-20T10:48:52+07:00","ip":"203.0.113.10","action":"login","result":"failed","npm_masked":"1402***002","identity_hash":"ad3db6a67962065404f33d3ff18d02d4a92db032060d68866d139ed546874743","detail":"Verifier eksternal menolak autentikasi"}
+{"time":"2026-11-20T10:49:31+07:00","ip":"127.0.0.1","action":"ldap_failure","result":"error","npm_masked":"1402***001","identity_hash":"9255d1238d19b700797b6471fff2c4677812a0382b0e6ffb3895a3355585a036","incident_id":"ERR-20261120-3D7A75","detail":"RuntimeException: Mock LDAP timeout: koneksi ke server direktori gagal"}
+{"time":"2026-11-20T10:49:31+07:00","ip":"127.0.0.1","action":"application_error","result":"error","incident_id":"ERR-20261120-932977","detail":"RuntimeException: Mock LDAP timeout: koneksi ke server direktori gagal"}
+
+ID ERR-20261120-932977 sama dengan ID pada docs/error-log/bukti/generic-error-response.txt dan generic-error.png.

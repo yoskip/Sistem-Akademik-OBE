@@ -1,4 +1,7 @@
 <?php
+require_once __DIR__ . '/../includes/error_handler.php';
+obe_configure_error_handling();
+
 /**
  * Konfigurasi koneksi database + konstanta aplikasi.
  * Nilai dapat dioverride lewat environment variable server (Apache/PHP-FPM),
@@ -37,12 +40,9 @@ function db(): PDO
                 PDO::ATTR_EMULATE_PREPARES   => false,
             ]);
         } catch (PDOException $e) {
-            // Detail error tidak ditampilkan ke pengguna agar tidak membocorkan
-            // konfigurasi server/database.
-            http_response_code(500);
-            die('<div style="font-family:sans-serif;padding:24px">'
-                . '<h3>Koneksi database gagal</h3>'
-                . '<p>Pastikan MySQL di XAMPP berjalan dan database <b>db_obe</b> sudah diimpor.</p></div>');
+            $incidentId = obe_log_database_failure($e, 'db_connection');
+            obe_render_generic_error($incidentId);
+            exit(1);
         }
     }
     return $pdo;

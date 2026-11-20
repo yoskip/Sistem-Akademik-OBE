@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/ldap_guard.php';
 
 const LOGIN_MAX_ATTEMPTS = 5;
 const LOGIN_WINDOW_MINUTES = 15;
@@ -300,14 +301,71 @@ function require_login(): void
     send_no_cache_headers();
 }
 
+function deny_access(): void
+{
+    $user = current_user();
+    security_event('access_denied', 'denied', [
+        'user_id' => $user['id'] ?? null,
+        'identity' => $user['npm_nidn'] ?? $user['username'] ?? '',
+        'role' => $user['role'] ?? '',
+        'detail' => 'Hak akses tidak memadai untuk endpoint ini',
+    ]);
+    http_response_code(403);
+    include __DIR__ . '/forbidden.php';
+    exit;
+}
+
 function require_role(array $roles): void
 {
     require_login();
     if (!in_array(current_role(), $roles, true)) {
-        http_response_code(403);
-        include __DIR__ . '/forbidden.php';
-        exit;
+        deny_access();
     }
+}
+
+function obe_login_success_event(array $user): void
+{
+    security_event('login', 'success', [
+        'user_id'  => (int)($user['id'] ?? 0),
+        'identity' => $user['npm'] ?? $user['nidn'] ?? $user['username'] ?? '',
+        'role'     => (string)($user['role'] ?? ''),
+    ]);
+}
+
+function obe_login_failed_event(string $identity, string $ip, string $reason = 'Kredensial tidak valid'): void
+{
+    security_event('login', 'failed', [
+        'identity' => $identity,
+        'ip'       => $ip,
+        'detail'   => $reason,
+    ]);
+}
+
+function obe_logout_event(): void
+{
+    $user = current_user();
+    security_event('logout', 'success', [
+        'user_id'  => (int)($user['id'] ?? 0),
+        'identity' => $user['npm_nidn'] ?? $user['username'] ?? '',
+        'role'     => (string)($user['role'] ?? ''),
+    ]);
+}
+
+function obe_role_change_event(int $userId, string $identity, string $from, string $to): void
+{
+    security_event('role_change', 'success', [
+        'user_id'   => $userId,
+        'identity'  => $identity,
+        'from_role' => $from,
+        'to_role'   => $to,
+    ]);
+}
+
+function obe_mask_display_text(string $text): string
+{
+    $text = preg_replace('/\b[a-f0-9]{64}\b/i', '[hash]', $text) ?? $text;
+    $text = preg_replace('/\b[0-9]{10}\b/', '****', $text) ?? $text;
+    return $text;
 }
 
 /** Hak kelola data master kurikulum: admin + kaprodi */
@@ -340,12 +398,19 @@ function csrf_field(): string
     return '<input type="hidden" name="csrf" value="' . e(csrf_token()) . '">';
 }
 
+function reject_csrf(): void
+{
+    security_event('csrf_rejected', 'denied', ['detail' => 'Token CSRF tidak valid']);
+    http_response_code(419);
+    echo 'Token keamanan tidak valid. Muat ulang halaman dan coba lagi.';
+    exit;
+}
+
 function verify_csrf(): void
 {
     $token = $_POST['csrf'] ?? '';
     if (empty($_SESSION['csrf']) || !hash_equals($_SESSION['csrf'], $token)) {
-        http_response_code(419);
-        die('Token keamanan tidak valid. Muat ulang halaman dan coba lagi.');
+        reject_csrf();
     }
 }
 

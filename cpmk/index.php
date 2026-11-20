@@ -5,7 +5,7 @@ $can = can_manage_cpmk();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
-    if (!$can) { http_response_code(403); die('Akses ditolak'); }
+    if (!$can) { deny_access(); }
     $action = $_POST['action'] ?? '';
     if ($action === 'save') {
         $id = (int)($_POST['id'] ?? 0);
@@ -41,7 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     flash('success', 'CPMK berhasil ditambahkan.');
                 }
                 $pdo->commit();
-            } catch (PDOException $e) {
+            } catch (PDOException $e) { obe_log_database_failure($e);
                 if ($pdo->inTransaction()) $pdo->rollBack();
                 flash('danger', 'Gagal menyimpan: kode CPMK mungkin sudah dipakai.');
             }
@@ -56,7 +56,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $pdo->prepare('DELETE FROM cpmk WHERE id=?')->execute([(int)$id]);
                 log_activity('delete', 'cpmk', 'CPMK dihapus');
                 flash('success', 'CPMK dihapus.');
-            } catch (PDOException $e) {
+            } catch (PDOException $e) { obe_log_database_failure($e);
                 flash('danger', 'CPMK tidak dapat dihapus karena masih direferensikan data lain.');
             }
         }

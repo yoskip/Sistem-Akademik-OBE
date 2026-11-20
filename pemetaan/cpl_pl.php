@@ -5,7 +5,7 @@ $can = can_manage_master();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
-    if (!$can) { http_response_code(403); die('Akses ditolak'); }
+    if (!$can) { deny_access(); }
     $pairs = $_POST['pairs'] ?? [];
     $cplIds = $pdo->query('SELECT id FROM cpl')->fetchAll(PDO::FETCH_COLUMN);
     $plIds = $pdo->query('SELECT id FROM profil_lulusan')->fetchAll(PDO::FETCH_COLUMN);
@@ -23,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdo->commit();
         log_activity('update', 'pemetaan', "Pemetaan CPL-PL disimpan ($n relasi)");
         flash('success', "Pemetaan CPL - Profil Lulusan berhasil disimpan ($n relasi).");
-    } catch (Throwable $e) {
+    } catch (Throwable $e) { obe_log_database_failure($e);
         $pdo->rollBack();
         flash('danger', 'Gagal menyimpan pemetaan.');
     }
