@@ -27,17 +27,15 @@
 - `[KONFIRMASI TIM]` Retensi log (mis. 30/90 hari) dan prosedur rotasi belum ditentukan; saat ini file ditulis append terus-menerus.
 - `[KONFIRMASI TIM]` Konfigurasi `php.ini` produksi (lihat `konfigurasi-keamanan.md`) perlu diterapkan oleh admin server, karena perubahan runtime tidak menggantikan `display_startup_errors` pada fase startup Apache.
 - `[KONFIRMASI TIM]` Daftar peran yang dicatat (`admin`, `kaprodi`, `dosen`) perlu diverifikasi jika ada penambahan peran baru.
-- `[KONFIRMASI TIM]` Reviewer PR minimal satu anggota belum ditentukan; jangan merge sebelum persetujuan.
+- Reviewer eksternal tidak tersedia di repo. Pemilik repo menyetujui dan melakukan merge PR #1 atas instruksi eksplisit pengguna.
 
 ## 3. Status GitHub aktual
 
-- Branch `error-log` dibuat dari `main`, commit `3f03d0a`, dan berhasil di-push ke `origin/error-log`.
-- Pull Request dibuat: **#1 – Implementasi Error Handling dan Security Logging**  
-  https://github.com/yoskip/Sistem-Akademik-OBE/pull/1
-- Permintaan review via API **gagal (HTTP 422)**:
-  - `HasanBiasaAje` hanya tercantum sebagai contributor, bukan collaborator, sehingga GitHub menolak permintaan review.
-  - `yoskip` adalah collaborator satu-satunya sekaligus author PR, sehingga GitHub menolak review dari author.
-- Belum ada approval dan PR **tidak di-merge**. `[KONFIRMASI TIM]` Tambahkan minimal satu anggota sebagai collaborator atau minta review manual melalui link PR, lalu setujui sebelum merge.
+- Branch `error-log` dibuat dari `main`, commit `3f03d0a` + `e54e682`, dan berhasil di-push ke `origin/error-log`.
+- Pull Request: **#1 – Implementasi Error Handling dan Security Logging** — https://github.com/yoskip/Sistem-Akademik-OBE/pull/1
+- Sebelum merge, permintaan review via API ditolak GitHub (HTTP 422): `HasanBiasaAje` bukan collaborator dan `yoskip` adalah author PR sehingga tidak dapat menyetujui PR sendiri.
+- Atas instruksi eksplisit pengguna (pemilik repo), PR #1 telah **di-merge ke `main`** dengan metode squash sebagai commit `753e1af`. Tidak ada klaim approval dari anggota lain.
+- Branch `error-log` masih tersimpan di remote; `main` lokal sudah di-fast-forward ke `753e1af`.
 
 ## 4. Catatan etika
 
