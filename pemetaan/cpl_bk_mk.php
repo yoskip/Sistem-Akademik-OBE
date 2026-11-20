@@ -5,7 +5,7 @@ $can = can_manage_master();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
-    if (!$can) { http_response_code(403); die('Akses ditolak'); }
+    if (!$can) { deny_access(); }
     $action = $_POST['action'] ?? '';
     if ($action === 'save') {
         $cplId = (int)($_POST['cpl_id'] ?? 0);

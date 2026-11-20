@@ -126,7 +126,7 @@ include __DIR__ . '/../includes/header.php';
                 <div class="avatar sm mt-1"><?= e(strtoupper(substr($r['nama'] ?? 'S', 0, 1))) ?></div>
                 <div class="flex-grow-1">
                   <div class="small"><b><?= e($r['nama'] ?? 'Sistem') ?></b> &middot; <?= e($r['aksi']) ?> <span class="text-muted">(<?= e($r['modul']) ?>)</span></div>
-                  <div class="text-muted" style="font-size:.75rem"><?= e($r['keterangan']) ?></div>
+                  <div class="text-muted" style="font-size:.75rem"><?= e(obe_mask_display_text((string)($r['keterangan'] ?? ''))) ?></div>
                 </div>
                 <div class="text-muted" style="font-size:.72rem"><?= e(date('d/m H:i', strtotime($r['created_at']))) ?></div>
               </div>

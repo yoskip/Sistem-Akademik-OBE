@@ -35,7 +35,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             flash('danger', 'Password minimal 6 karakter.');
         } else {
             try {
+                $roleBefore = '-';
                 if ($id > 0) {
+                    $roleStmt = $pdo->prepare('SELECT r.nama AS role FROM users u JOIN roles r ON r.id = u.role_id WHERE u.id = ?');
+                    $roleStmt->execute([$id]);
+                    $roleBefore = (string)($roleStmt->fetchColumn() ?: '-');
+
                     if ($id === (int)$me['id']) { $aktif = 1; }
                     if ($password !== '') {
                         $pdo->prepare('UPDATE users SET nama=?, username=?, email=?, password=?, role_id=?, aktif=? WHERE id=?')
@@ -44,16 +49,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $pdo->prepare('UPDATE users SET nama=?, username=?, email=?, role_id=?, aktif=? WHERE id=?')
                             ->execute([$nama, $username, $email ?: null, $roleId, $aktif, $id]);
                     }
-                    log_activity('update', 'users', "Pengguna $username diperbarui");
+                    log_activity('update', 'users', 'Data pengguna diperbarui');
                     flash('success', 'Pengguna diperbarui.');
                 } else {
                     $pdo->prepare('INSERT INTO users (nama, username, email, password, role_id, aktif) VALUES (?,?,?,?,?,?)')
                         ->execute([$nama, $username, $email ?: null, hash_password($password), $roleId, $aktif]);
-                    log_activity('create', 'users', "Pengguna $username ditambahkan");
+                    $id = (int)$pdo->lastInsertId();
+                    log_activity('create', 'users', 'Pengguna ditambahkan');
                     flash('success', 'Pengguna ditambahkan.');
                 }
+
+                $roleStmt = $pdo->prepare('SELECT nama FROM roles WHERE id = ?');
+                $roleStmt->execute([$roleId]);
+                $roleAfter = (string)($roleStmt->fetchColumn() ?: '-');
+                if ($roleBefore !== $roleAfter) {
+                    obe_role_change_event($id, $username, $roleBefore, $roleAfter);
+                    log_activity('role_change', 'users', 'Peran pengguna diperbarui');
+                }
                 redirect('index.php');
-            } catch (PDOException $e) {
+            } catch (PDOException $e) { obe_log_database_failure($e);
                 flash('danger', 'Gagal menyimpan: username mungkin sudah dipakai.');
             }
         }
@@ -66,7 +80,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             flash('danger', 'Anda tidak dapat menghapus akun sendiri.');
         } else {
             $pdo->prepare('DELETE FROM users WHERE id=?')->execute([(int)$id]);
-            log_activity('delete', 'users', "Pengguna id $id dihapus");
+            log_activity('delete', 'users', 'Pengguna dihapus');
             flash('success', 'Pengguna dihapus.');
             redirect('index.php');
         }

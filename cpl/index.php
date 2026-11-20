@@ -6,7 +6,7 @@ $domains = ['S' => 'Sikap (S)', 'P' => 'Pengetahuan (P)', 'KU' => 'Keterampilan 
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
-    if (!$can) { http_response_code(403); die('Akses ditolak'); }
+    if (!$can) { deny_access(); }
     $action = $_POST['action'] ?? '';
     if ($action === 'save') {
         $id = (int)($_POST['id'] ?? 0);
@@ -36,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     log_activity('create', 'cpl', "CPL $kode ditambahkan");
                     flash('success', 'CPL berhasil ditambahkan.');
                 }
-            } catch (PDOException $e) {
+            } catch (PDOException $e) { obe_log_database_failure($e);
                 flash('danger', 'Gagal menyimpan: kode CPL mungkin sudah dipakai.');
             }
         }

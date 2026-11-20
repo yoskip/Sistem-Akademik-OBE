@@ -44,9 +44,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             burn_password_verification($password);
         }
 
-        if (!$user || !$verified || (int)$user['aktif'] !== 1) {
+        $ldapAllowed = ($user && $verified && (int)$user['aktif'] === 1)
+            ? obe_verify_ldap($identity, $password)
+            : true;
+
+        if (!$user || !$verified || !$ldapAllowed || (int)$user['aktif'] !== 1) {
             record_login_failure($identityHash, $ip);
             log_login_failure($identityHash, $ip);
+            obe_login_failed_event(
+                $identity,
+                $ip,
+                $ldapAllowed ? 'Kredensial tidak valid' : 'Verifier eksternal menolak autentikasi'
+            );
             $error = LOGIN_FAILED_MESSAGE;
         } else {
             session_regenerate_id(true);
@@ -61,6 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['last_activity'] = time();
             unset($_SESSION['csrf']);
             log_activity('login', 'auth', 'Pengguna berhasil masuk');
+            obe_login_success_event($user);
             flash('success', 'Selamat datang, ' . $user['nama'] . '.');
             redirect(BASE_URL . '/dashboard/index.php');
         }

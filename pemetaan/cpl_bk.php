@@ -5,7 +5,7 @@ $can = can_manage_master();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
-    if (!$can) { http_response_code(403); die('Akses ditolak'); }
+    if (!$can) { deny_access(); }
     $pairs = (array)($_POST['pairs'] ?? []);
     $cplIds = array_flip(array_map('intval', $pdo->query('SELECT id FROM cpl')->fetchAll(PDO::FETCH_COLUMN)));
     $bkIds = array_flip(array_map('intval', $pdo->query('SELECT id FROM bahan_kajian')->fetchAll(PDO::FETCH_COLUMN)));
@@ -21,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pdo->commit();
         log_activity('update', 'pemetaan', "Pemetaan CPL-BK disimpan ($n relasi)");
         flash('success', "Pemetaan CPL - Bahan Kajian disimpan ($n relasi).");
-    } catch (Throwable $e) {
+    } catch (Throwable $e) { obe_log_database_failure($e);
         $pdo->rollBack();
         flash('danger', 'Gagal menyimpan pemetaan.');
     }
