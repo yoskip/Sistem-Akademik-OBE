@@ -29,6 +29,16 @@
 - `[KONFIRMASI TIM]` Daftar peran yang dicatat (`admin`, `kaprodi`, `dosen`) perlu diverifikasi jika ada penambahan peran baru.
 - `[KONFIRMASI TIM]` Reviewer PR minimal satu anggota belum ditentukan; jangan merge sebelum persetujuan.
 
-## 3. Catatan etika
+## 3. Status GitHub aktual
+
+- Branch `error-log` dibuat dari `main`, commit `3f03d0a`, dan berhasil di-push ke `origin/error-log`.
+- Pull Request dibuat: **#1 – Implementasi Error Handling dan Security Logging**  
+  https://github.com/yoskip/Sistem-Akademik-OBE/pull/1
+- Permintaan review via API **gagal (HTTP 422)**:
+  - `HasanBiasaAje` hanya tercantum sebagai contributor, bukan collaborator, sehingga GitHub menolak permintaan review.
+  - `yoskip` adalah collaborator satu-satunya sekaligus author PR, sehingga GitHub menolak review dari author.
+- Belum ada approval dan PR **tidak di-merge**. `[KONFIRMASI TIM]` Tambahkan minimal satu anggota sebagai collaborator atau minta review manual melalui link PR, lalu setujui sebelum merge.
+
+## 4. Catatan etika
 
 Tidak ada klaim bahwa LDAP sudah terhubung, tidak ada screenshot hasil pengujian yang dibuat-buat, dan tidak ada hasil test yang ditulis lulus tanpa dijalankan. Bukti aktual ada di `docs/error-log/bukti/` dan `hasil-pengujian.md`.
