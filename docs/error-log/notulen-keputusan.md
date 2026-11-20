@@ -33,6 +33,7 @@
 
 - Branch `error-log` dibuat dari `main`, commit `3f03d0a` + `e54e682`, dan berhasil di-push ke `origin/error-log`.
 - Pull Request: **#1 – Implementasi Error Handling dan Security Logging** — https://github.com/yoskip/Sistem-Akademik-OBE/pull/1
+- Ketentuan `github.com/.../pull/12` pada soal adalah **contoh format URL**, bukan nomor PR wajib. Nomor PR ditentukan otomatis oleh GitHub, sehingga `pull/1` di repo ini sudah memenuhi ketentuan.
 - Sebelum merge, permintaan review via API ditolak GitHub (HTTP 422): `HasanBiasaAje` bukan collaborator dan `yoskip` adalah author PR sehingga tidak dapat menyetujui PR sendiri.
 - Atas instruksi eksplisit pengguna (pemilik repo), PR #1 telah **di-merge ke `main`** dengan metode squash sebagai commit `753e1af`. Tidak ada klaim approval dari anggota lain.
 - Branch `error-log` masih tersimpan di remote; `main` lokal sudah di-fast-forward ke `753e1af`.
