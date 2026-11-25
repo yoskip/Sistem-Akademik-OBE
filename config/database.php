@@ -1,6 +1,8 @@
 <?php
 require_once __DIR__ . '/../includes/error_handler.php';
+require_once __DIR__ . '/env.php';
 obe_configure_error_handling();
+obe_load_env();
 
 /**
  * Konfigurasi koneksi database + konstanta aplikasi.
@@ -18,9 +20,10 @@ function env_value(string $key, string $default = ''): string
 }
 
 define('DB_HOST', env_value('DB_HOST', '127.0.0.1'));
-define('DB_NAME', env_value('DB_NAME', 'db_obe'));
-define('DB_USER', env_value('DB_USER', 'root'));
-define('DB_PASS', env_value('DB_PASS', ''));
+define('DB_PORT', env_value('DB_PORT', '3306'));
+define('DB_NAME', env_value('DB_DATABASE', env_value('DB_NAME', 'db_obe')));
+define('DB_USER', env_value('DB_USERNAME', env_value('DB_USER', 'root')));
+define('DB_PASS', env_value('DB_PASSWORD', env_value('DB_PASS', '')));
 
 define('APP_NAME', 'SI Kurikulum OBE');
 define('APP_PRODI', 'Teknik Informatika - Universitas YARSI');
@@ -32,7 +35,7 @@ function db(): PDO
 {
     static $pdo = null;
     if ($pdo === null) {
-        $dsn = 'mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=utf8mb4';
+        $dsn = 'mysql:host=' . DB_HOST . ';port=' . DB_PORT . ';dbname=' . DB_NAME . ';charset=utf8mb4';
         try {
             $pdo = new PDO($dsn, DB_USER, DB_PASS, [
                 PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
