@@ -134,7 +134,7 @@ Pemeriksaan sintaks: `php -l` untuk `config/env.php`, `config/database.php`, dan
 - Judul PR: `Security: Pengamanan Secrets dan Konfigurasi Server`.
 - Merge tidak dilakukan otomatis; minimal satu anggota kelompok wajib review dan menyetujui.
 
-Status Pull Request akan dicatat setelah branch berhasil di-push dan PR dibuat.
+Status Pull Request: **open, belum di-merge**. URL: https://github.com/yoskip/Sistem-Akademik-OBE/pull/2
 
 ## 11. Kesimpulan
 
