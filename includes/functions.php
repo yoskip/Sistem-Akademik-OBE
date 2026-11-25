@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/ldap_guard.php';
+send_security_headers();
 
 const LOGIN_MAX_ATTEMPTS = 5;
 const LOGIN_WINDOW_MINUTES = 15;
@@ -182,6 +183,16 @@ function validate_login_identity(mixed $identity): bool
         return true;
     }
     return filter_var($trimmed, FILTER_VALIDATE_EMAIL) !== false;
+}
+
+function send_security_headers(): void
+{
+    if (headers_sent()) {
+        return;
+    }
+    header('X-Content-Type-Options: nosniff');
+    header('X-Frame-Options: DENY');
+    header('Referrer-Policy: strict-origin-when-cross-origin');
 }
 
 function redirect(string $path): void

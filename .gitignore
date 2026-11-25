@@ -21,5 +21,7 @@ Thumbs.db
 
 # Generated / backup files
 *.bak
+*.old
+*.backup
 *.sql.gz
 uploads/

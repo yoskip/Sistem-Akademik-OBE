@@ -1,0 +1,19 @@
+Options -Indexes
+
+<IfModule mod_autoindex.c>
+    IndexIgnore *
+</IfModule>
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    RewriteRule ^(?:config|database|docs|includes|storage|tests)(?:/|$) - [F,L,NC]
+    RewriteRule (^|/)\. - [F,L]
+    RewriteRule \.(?:sql|log|bak|old|backup|env|ini|java|xlsx|xls|csv|md|txt)$ - [F,L,NC]
+</IfModule>
+
+<IfModule mod_authz_core.c>
+    <FilesMatch "\.(?:sql|log|bak|old|backup|env|ini|java|xlsx|xls|csv|md|txt)$">
+        Require all denied
+    </FilesMatch>
+</IfModule>
